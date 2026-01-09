@@ -1,14 +1,21 @@
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { StatCard } from "@/components/StatCard";
 import { RunAutomationForm } from "@/components/RunAutomationForm";
 import { SignalsTable } from "@/components/SignalsTable";
 import { ConfidenceChart } from "@/components/ConfidenceChart";
 import { useSignals } from "@/hooks/use-automation";
-import { Activity, Zap, BarChart3, Database } from "lucide-react";
+import { Activity, Zap, BarChart3, Database, ShieldCheck, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Dashboard() {
   const { data: signals } = useSignals();
+  const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("stripe_session_id");
+    if (saved) setPaidSessionId(saved);
+  }, []);
   
   // Calculate stats
   const totalSignals = signals?.length || 0;
@@ -49,6 +56,32 @@ export default function Dashboard() {
           animate="show"
           className="space-y-8"
         >
+          {/* Status Banner */}
+          <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
+            <div className="flex items-center gap-4">
+              <div className="p-2 bg-primary/20 rounded-xl">
+                <Zap className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wider">Execution Status</h2>
+                <p className="text-xs text-muted-foreground font-mono">
+                  {paidSessionId ? "READY TO EXECUTE" : "LOCKED - PAYMENT REQUIRED"}
+                </p>
+              </div>
+            </div>
+            {paidSessionId ? (
+              <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-full border border-emerald-500/20 text-xs font-bold">
+                <ShieldCheck className="w-3 h-3" />
+                VERIFIED
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20 text-xs font-bold">
+                <Lock className="w-3 h-3" />
+                LOCKED
+              </div>
+            )}
+          </div>
+
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <motion.div variants={item}>

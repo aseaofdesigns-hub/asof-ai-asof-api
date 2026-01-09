@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRunAutomation } from "@/hooks/use-automation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Play, CheckCircle2 } from "lucide-react";
+import { Loader2, Play, CheckCircle2, Lock, DollarSign } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { api } from "@shared/routes";
+import { useToast } from "@/hooks/use-toast";
 
 const DEFAULT_JSON = JSON.stringify({
   task: "analyze_market_sentiment",
@@ -21,29 +23,69 @@ export function RunAutomationForm() {
   const [agentId, setAgentId] = useState("agent-001");
   const [payload, setPayload] = useState(DEFAULT_JSON);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
+  const { toast } = useToast();
   
-  const { mutate, isPending, data } = useRunAutomation();
+  const { mutate: runAutomation, isPending: isRunning, data } = useRunAutomation();
+
+  useEffect(() => {
+    const saved = localStorage.getItem("stripe_session_id");
+    if (saved) setPaidSessionId(saved);
+  }, []);
+
+  const initiatePayment = async () => {
+    try {
+      const res = await fetch(api.payments.create.path, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to initiate payment");
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Payment initialization failed",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!paidSessionId) return;
     setJsonError(null);
 
     try {
       const parsedPayload = JSON.parse(payload);
-      mutate({ agent_id: agentId, payload: parsedPayload });
+      runAutomation({ 
+        agent_id: agentId, 
+        payload: parsedPayload,
+        sessionId: paidSessionId 
+      });
+      // Clear session after use
+      localStorage.removeItem("stripe_session_id");
+      setPaidSessionId(null);
     } catch (err) {
       setJsonError("Invalid JSON format");
     }
   };
 
+  const isLocked = !paidSessionId;
+
   return (
-    <Card className="glass-card border-white/5 overflow-hidden h-full flex flex-col">
+    <Card className="glass-card border-white/5 overflow-hidden h-full flex flex-col relative">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500" />
       
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Play className="w-5 h-5 text-primary" />
-          Run Automation
+        <CardTitle className="flex items-center justify-between text-lg">
+          <div className="flex items-center gap-2">
+            <Play className="w-5 h-5 text-primary" />
+            Run Automation
+          </div>
+          {isLocked && (
+            <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded border border-amber-500/20">
+              <Lock className="w-3 h-3" />
+              Locked
+            </div>
+          )}
         </CardTitle>
       </CardHeader>
       
@@ -59,6 +101,7 @@ export function RunAutomationForm() {
               onChange={(e) => setAgentId(e.target.value)}
               className="glass-input font-mono"
               placeholder="e.g. agent-alpha-01"
+              disabled={isLocked}
               required
             />
           </div>
@@ -80,26 +123,38 @@ export function RunAutomationForm() {
               onChange={(e) => setPayload(e.target.value)}
               className="glass-input font-mono text-xs flex-1 min-h-[200px] resize-none leading-relaxed"
               spellCheck={false}
+              disabled={isLocked}
             />
           </div>
 
-          <Button 
-            type="submit" 
-            disabled={isPending}
-            className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300"
-          >
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Processing Signal...
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-5 w-5 fill-current" />
-                Execute Sequence
-              </>
-            )}
-          </Button>
+          {isLocked ? (
+            <Button 
+              type="button"
+              onClick={initiatePayment}
+              className="w-full h-12 text-base font-semibold bg-amber-500 hover:bg-amber-600 text-black shadow-lg shadow-amber-500/20 transition-all duration-300 gap-2"
+            >
+              <DollarSign className="h-5 w-5" />
+              Pay $0.50 to Unlock
+            </Button>
+          ) : (
+            <Button 
+              type="submit" 
+              disabled={isRunning}
+              className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300"
+            >
+              {isRunning ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Processing Signal...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-5 w-5 fill-current" />
+                  Execute Sequence
+                </>
+              )}
+            </Button>
+          )}
         </form>
 
         <AnimatePresence>
