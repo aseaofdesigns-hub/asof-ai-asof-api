@@ -9,9 +9,30 @@ export const errorSchemas = {
   internal: z.object({
     message: z.string(),
   }),
+  unauthorized: z.object({
+    message: z.string(),
+  }),
 };
 
 export const api = {
+  payments: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/create-payment',
+      responses: {
+        200: z.object({ url: z.string() }),
+        500: errorSchemas.internal
+      }
+    },
+    verify: {
+      method: 'GET' as const,
+      path: '/api/verify-payment/:sessionId',
+      responses: {
+        200: z.object({ status: z.string() }),
+        404: z.object({ message: z.string() })
+      }
+    }
+  },
   automation: {
     run: {
       method: 'POST' as const,
@@ -27,6 +48,7 @@ export const api = {
           })
         }),
         400: errorSchemas.validation,
+        401: errorSchemas.unauthorized,
         500: errorSchemas.internal
       },
     },
