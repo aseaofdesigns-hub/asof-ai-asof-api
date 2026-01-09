@@ -1,0 +1,131 @@
+import { Header } from "@/components/Header";
+import { StatCard } from "@/components/StatCard";
+import { RunAutomationForm } from "@/components/RunAutomationForm";
+import { SignalsTable } from "@/components/SignalsTable";
+import { ConfidenceChart } from "@/components/ConfidenceChart";
+import { useSignals } from "@/hooks/use-automation";
+import { Activity, Zap, BarChart3, Database } from "lucide-react";
+import { motion } from "framer-motion";
+
+export default function Dashboard() {
+  const { data: signals } = useSignals();
+  
+  // Calculate stats
+  const totalSignals = signals?.length || 0;
+  const avgConfidence = signals?.length 
+    ? (signals.reduce((acc, curr) => acc + curr.confidence, 0) / signals.length * 100).toFixed(1)
+    : "0.0";
+  const lastActive = signals?.length 
+    ? new Date(signals[0].timestamp!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : "--:--";
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary/20">
+      <div className="fixed inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none z-0 mix-blend-overlay"></div>
+      <div className="fixed top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] pointer-events-none z-0"></div>
+      <div className="fixed bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none z-0"></div>
+
+      <Header />
+
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        <motion.div 
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="space-y-8"
+        >
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <motion.div variants={item}>
+              <StatCard 
+                title="Total Signals" 
+                value={totalSignals} 
+                icon={<Database className="w-5 h-5" />} 
+                trend="+12% today"
+                trendUp={true}
+              />
+            </motion.div>
+            <motion.div variants={item}>
+              <StatCard 
+                title="Avg Confidence" 
+                value={`${avgConfidence}%`} 
+                icon={<Activity className="w-5 h-5" />} 
+                trend={parseFloat(avgConfidence) > 80 ? "High accuracy" : "Calibration needed"}
+                trendUp={parseFloat(avgConfidence) > 80}
+              />
+            </motion.div>
+            <motion.div variants={item}>
+              <StatCard 
+                title="System Status" 
+                value="Online" 
+                icon={<Zap className="w-5 h-5" />} 
+                className="border-emerald-500/20"
+                trend="Latency: 45ms"
+                trendUp={true}
+              />
+            </motion.div>
+            <motion.div variants={item}>
+              <StatCard 
+                title="Last Active" 
+                value={lastActive} 
+                icon={<BarChart3 className="w-5 h-5" />} 
+              />
+            </motion.div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+            {/* Left Column: Input Form */}
+            <motion.div variants={item} className="lg:col-span-1 h-full">
+              <RunAutomationForm />
+            </motion.div>
+            
+            {/* Right Column: Chart & Table */}
+            <motion.div variants={item} className="lg:col-span-2 flex flex-col gap-6 h-full">
+              {/* Chart Section */}
+              <div className="h-[240px] glass-card rounded-2xl p-6 border border-white/5 relative overflow-hidden">
+                 <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-primary" />
+                      Confidence Trends
+                    </h3>
+                 </div>
+                 <div className="h-[160px] w-full">
+                   <ConfidenceChart />
+                 </div>
+              </div>
+
+              {/* Table Section */}
+              <div className="flex-1 glass-card rounded-2xl p-6 border border-white/5 overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between mb-4 shrink-0">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <Database className="w-4 h-4 text-primary" />
+                    Recent Signals
+                  </h3>
+                </div>
+                <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
+                  <SignalsTable />
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      </main>
+    </div>
+  );
+}
