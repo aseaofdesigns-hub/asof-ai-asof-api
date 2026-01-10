@@ -17,22 +17,52 @@ export async function registerRoutes(
       const stripe = await getUncachableStripeClient();
       const { tier } = api.payments.create.input.parse(req.body);
       
-      const result = await db.execute(
-        sql`SELECT p.id as product_id, pr.id as price_id, p.name, pr.unit_amount
-            FROM stripe.products p
-            JOIN stripe.prices pr ON pr.product = p.id
-            WHERE p.metadata->>'tier' = ${tier}
-            AND p.active = true
-            AND pr.active = true
-            ORDER BY p.id DESC
-            LIMIT 1`
-      );
+      // Live Stripe price IDs - fallback if database sync hasn't happened
+      const livePriceIds: Record<string, { price_id: string; unit_amount: number }> = {
+        lite: { price_id: 'price_1SnuQmAGtLlBc3WPf2LwcpRH', unit_amount: 50 },
+        pro: { price_id: 'price_1SnuQnAGtLlBc3WP0kv4feWH', unit_amount: 100 },
+        max: { price_id: 'price_1SnuQnAGtLlBc3WPMh06ap1f', unit_amount: 250 },
+      };
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: `No price found for tier: ${tier}` });
+      let price_id: string;
+      let unit_amount: number;
+
+      try {
+        const result = await db.execute(
+          sql`SELECT p.id as product_id, pr.id as price_id, p.name, pr.unit_amount
+              FROM stripe.products p
+              JOIN stripe.prices pr ON pr.product = p.id
+              WHERE p.metadata->>'tier' = ${tier}
+              AND p.active = true
+              AND pr.active = true
+              ORDER BY p.id DESC
+              LIMIT 1`
+        );
+
+        if (result.rows.length > 0) {
+          const row = result.rows[0] as any;
+          price_id = row.price_id;
+          unit_amount = row.unit_amount;
+        } else {
+          // Use fallback
+          const fallback = livePriceIds[tier];
+          if (!fallback) {
+            return res.status(404).json({ message: `No price found for tier: ${tier}` });
+          }
+          price_id = fallback.price_id;
+          unit_amount = fallback.unit_amount;
+          console.log(`Using fallback price for tier ${tier}: ${price_id}`);
+        }
+      } catch (dbErr) {
+        // Database query failed, use fallback
+        console.log('Database query failed, using fallback prices:', dbErr);
+        const fallback = livePriceIds[tier];
+        if (!fallback) {
+          return res.status(404).json({ message: `No price found for tier: ${tier}` });
+        }
+        price_id = fallback.price_id;
+        unit_amount = fallback.unit_amount;
       }
-
-      const { price_id, unit_amount, name } = result.rows[0] as any;
 
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers.host || req.headers.origin?.replace(/^https?:\/\//, '');
