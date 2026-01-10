@@ -19,6 +19,9 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/create-payment',
+      input: z.object({
+        tier: z.enum(['lite', 'pro', 'max'])
+      }),
       responses: {
         200: z.object({ url: z.string() }),
         500: errorSchemas.internal

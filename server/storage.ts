@@ -5,7 +5,7 @@ import { desc, eq } from "drizzle-orm";
 export interface IStorage {
   createSignal(signal: InsertSignal): Promise<Signal>;
   getSignals(): Promise<Signal[]>;
-  createPayment(payment: { stripeSessionId: string, amount: number }): Promise<Payment>;
+  createPayment(payment: { stripeSessionId: string, amount: number, tier: string }): Promise<Payment>;
   getPaymentBySessionId(sessionId: string): Promise<Payment | undefined>;
   updatePaymentStatus(sessionId: string, status: string): Promise<Payment>;
 }
@@ -20,10 +20,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(signals).orderBy(desc(signals.timestamp));
   }
 
-  async createPayment(data: { stripeSessionId: string, amount: number }): Promise<Payment> {
+  async createPayment(data: { stripeSessionId: string, amount: number, tier: string }): Promise<Payment> {
     const [payment] = await db.insert(payments).values({
       stripeSessionId: data.stripeSessionId,
       amount: data.amount,
+      tier: data.tier,
       status: "pending"
     }).returning();
     return payment;

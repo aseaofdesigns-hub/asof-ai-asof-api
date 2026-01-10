@@ -18,13 +18,23 @@ export async function registerRoutes(
     if (!stripe) return res.status(500).json({ message: "Stripe not configured" });
     
     try {
+      const { tier } = api.payments.create.input.parse(req.body);
+      
+      const prices = {
+        lite: { amount: 50, name: "ASOF Lite" },
+        pro: { amount: 100, name: "ASOF Pro" },
+        max: { amount: 250, name: "ASOF Max" }
+      };
+
+      const selected = prices[tier as keyof typeof prices];
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [{
           price_data: {
             currency: 'usd',
-            product_data: { name: 'AI Automation Run' },
-            unit_amount: 50, // $0.50
+            product_data: { name: selected.name },
+            unit_amount: selected.amount,
           },
           quantity: 1,
         }],
@@ -35,11 +45,15 @@ export async function registerRoutes(
 
       await storage.createPayment({
         stripeSessionId: session.id,
-        amount: 50
+        amount: selected.amount,
+        tier: tier
       });
 
       res.json({ url: session.url });
     } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid tier" });
+      }
       res.status(500).json({ message: "Failed to create checkout session" });
     }
   });

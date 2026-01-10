@@ -5,10 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Play, CheckCircle2, Lock, DollarSign } from "lucide-react";
+import { Loader2, Play, CheckCircle2, Lock, DollarSign, Zap, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 const DEFAULT_JSON = JSON.stringify({
   task: "analyze_market_sentiment",
@@ -33,9 +34,13 @@ export function RunAutomationForm() {
     if (saved) setPaidSessionId(saved);
   }, []);
 
-  const initiatePayment = async () => {
+  const initiatePayment = async (tier: 'lite' | 'pro' | 'max') => {
     try {
-      const res = await fetch(api.payments.create.path, { method: "POST" });
+      const res = await fetch(api.payments.create.path, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier })
+      });
       if (!res.ok) throw new Error("Failed to initiate payment");
       const { url } = await res.json();
       window.location.href = url;
@@ -63,12 +68,40 @@ export function RunAutomationForm() {
       // Clear session after use
       localStorage.removeItem("stripe_session_id");
       setPaidSessionId(null);
+      queryClient.invalidateQueries({ queryKey: [api.automation.list.path] });
     } catch (err) {
       setJsonError("Invalid JSON format");
     }
   };
 
   const isLocked = !paidSessionId;
+
+  const tiers = [
+    {
+      id: 'lite',
+      name: 'ASOF Lite',
+      price: '$0.50',
+      description: 'Single checks & daily validation',
+      icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
+      color: 'emerald'
+    },
+    {
+      id: 'pro',
+      name: 'ASOF Pro',
+      price: '$1.00',
+      description: 'High-risk decisions with evidence',
+      icon: <Zap className="w-4 h-4 text-blue-400" />,
+      color: 'blue'
+    },
+    {
+      id: 'max',
+      name: 'ASOF Max',
+      price: '$2.50',
+      description: 'Mission-critical multi-signal',
+      icon: <ShieldCheck className="w-4 h-4 text-purple-400" />,
+      color: 'purple'
+    }
+  ] as const;
 
   return (
     <Card className="glass-card border-white/5 overflow-hidden h-full flex flex-col relative">
@@ -90,53 +123,69 @@ export function RunAutomationForm() {
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col gap-6">
-        <form onSubmit={handleSubmit} className="space-y-6 flex-1 flex flex-col">
-          <div className="space-y-2">
-            <Label htmlFor="agentId" className="text-xs font-medium uppercase text-muted-foreground tracking-wider">
-              Agent Identity
-            </Label>
-            <Input
-              id="agentId"
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
-              className="glass-input font-mono"
-              placeholder="e.g. agent-alpha-01"
-              disabled={isLocked}
-              required
-            />
-          </div>
-
-          <div className="space-y-2 flex-1 flex flex-col">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="payload" className="text-xs font-medium uppercase text-muted-foreground tracking-wider">
-                Operation Payload (JSON)
-              </Label>
-              {jsonError && (
-                <span className="text-xs text-rose-400 font-medium animate-pulse">
-                  {jsonError}
-                </span>
-              )}
+        {isLocked ? (
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Select a Pricing Tier</p>
+            <div className="grid grid-cols-1 gap-3">
+              {tiers.map((tier) => (
+                <button
+                  key={tier.id}
+                  onClick={() => initiatePayment(tier.id)}
+                  className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left group w-full"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg bg-${tier.color}-500/20`}>
+                      {tier.icon}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">{tier.name}</h4>
+                      <p className="text-[10px] text-muted-foreground">{tier.description}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-white">{tier.price}</span>
+                    <p className="text-[10px] text-primary font-bold">Select</p>
+                  </div>
+                </button>
+              ))}
             </div>
-            <Textarea
-              id="payload"
-              value={payload}
-              onChange={(e) => setPayload(e.target.value)}
-              className="glass-input font-mono text-xs flex-1 min-h-[200px] resize-none leading-relaxed"
-              spellCheck={false}
-              disabled={isLocked}
-            />
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6 flex-1 flex flex-col">
+            <div className="space-y-2">
+              <Label htmlFor="agentId" className="text-xs font-medium uppercase text-muted-foreground tracking-wider">
+                Agent Identity
+              </Label>
+              <Input
+                id="agentId"
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value)}
+                className="glass-input font-mono"
+                placeholder="e.g. agent-alpha-01"
+                required
+              />
+            </div>
 
-          {isLocked ? (
-            <Button 
-              type="button"
-              onClick={initiatePayment}
-              className="w-full h-12 text-base font-semibold bg-amber-500 hover:bg-amber-600 text-black shadow-lg shadow-amber-500/20 transition-all duration-300 gap-2"
-            >
-              <DollarSign className="h-5 w-5" />
-              Pay $0.50 to Unlock
-            </Button>
-          ) : (
+            <div className="space-y-2 flex-1 flex flex-col">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="payload" className="text-xs font-medium uppercase text-muted-foreground tracking-wider">
+                  Operation Payload (JSON)
+                </Label>
+                {jsonError && (
+                  <span className="text-xs text-rose-400 font-medium animate-pulse">
+                    {jsonError}
+                  </span>
+                )}
+              </div>
+              <Textarea
+                id="payload"
+                value={payload}
+                onChange={(e) => setPayload(e.target.value)}
+                className="glass-input font-mono text-xs flex-1 min-h-[200px] resize-none leading-relaxed"
+                spellCheck={false}
+              />
+            </div>
+
             <Button 
               type="submit" 
               disabled={isRunning}
@@ -154,8 +203,8 @@ export function RunAutomationForm() {
                 </>
               )}
             </Button>
-          )}
-        </form>
+          </form>
+        )}
 
         <AnimatePresence>
           {data && data.success && (

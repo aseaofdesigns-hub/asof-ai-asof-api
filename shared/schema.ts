@@ -16,6 +16,7 @@ export const payments = pgTable("payments", {
   stripeSessionId: text("stripe_session_id").notNull().unique(),
   status: text("status").notNull().default("pending"), // pending, paid
   amount: integer("amount").notNull(),
+  tier: text("tier").notNull().default("lite"), // lite, pro, max
   createdAt: timestamp("created_at").defaultNow(),
 });
 
