@@ -21,6 +21,12 @@ export function Header() {
           <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
             About
           </Link>
+          <Link href="/privacy" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
+            Privacy
+          </Link>
+          <Link href="/contact" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
+            Contact
+          </Link>
           <div className="h-4 w-px bg-white/10" />
           <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
             <Activity className="w-3 h-3" />
