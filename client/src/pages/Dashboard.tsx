@@ -56,6 +56,13 @@ export default function Dashboard() {
           animate="show"
           className="space-y-8"
         >
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">As-of AI Automation</h1>
+            <p className="text-muted-foreground mt-2 max-w-2xl">
+              ASOF.ai is a paid automation that verifies whether an assumption, signal, or dataset is still valid as of the current moment, returning a confidence-scored decision agents can safely act on.
+            </p>
+          </div>
+
           {/* Status Banner */}
           <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
             <div className="flex items-center gap-4">
