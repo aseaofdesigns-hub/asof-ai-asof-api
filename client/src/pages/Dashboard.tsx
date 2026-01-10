@@ -17,7 +17,6 @@ export default function Dashboard() {
     if (saved) setPaidSessionId(saved);
   }, []);
   
-  // Calculate stats
   const totalSignals = signals?.length || 0;
   const avgConfidence = signals?.length 
     ? (signals.reduce((acc, curr) => acc + curr.confidence, 0) / signals.length * 100).toFixed(1)
@@ -63,7 +62,6 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Status Banner */}
           <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
             <div className="flex items-center gap-4">
               <div className="p-2 bg-primary/20 rounded-xl">
@@ -89,7 +87,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <motion.div variants={item}>
               <StatCard 
@@ -128,16 +125,12 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          {/* Main Content Area */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-            {/* Left Column: Input Form */}
             <motion.div variants={item} className="lg:col-span-1 h-full">
               <RunAutomationForm />
             </motion.div>
             
-            {/* Right Column: Chart & Table */}
             <motion.div variants={item} className="lg:col-span-2 flex flex-col gap-6 h-full">
-              {/* Chart Section */}
               <div className="h-[240px] glass-card rounded-2xl p-6 border border-white/5 relative overflow-hidden">
                  <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -150,55 +143,6 @@ export default function Dashboard() {
                  </div>
               </div>
 
-              {/* Pricing Table (Moved and Resized) */}
-              <div className="glass-card rounded-2xl overflow-hidden border border-white/5">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[10px] text-left">
-                    <thead className="uppercase tracking-wider text-muted-foreground bg-white/5">
-                      <tr>
-                        <th className="px-4 py-2">Feature</th>
-                        <th className="px-4 py-2 text-center">Lite</th>
-                        <th className="px-4 py-2 text-center">Pro</th>
-                        <th className="px-4 py-2 text-center">Max</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      <tr className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-2 font-medium">Verdict</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                      </tr>
-                      <tr className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-2 font-medium">Score</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                      </tr>
-                      <tr className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-2 font-medium">Evidence</td>
-                        <td className="px-4 py-2 text-center">❌</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                      </tr>
-                      <tr className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-2 font-medium">Strict/Risk</td>
-                        <td className="px-4 py-2 text-center">❌</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                      </tr>
-                      <tr className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-2 font-medium">Conflict/Pri</td>
-                        <td className="px-4 py-2 text-center">❌</td>
-                        <td className="px-4 py-2 text-center">❌</td>
-                        <td className="px-4 py-2 text-center">✅</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Table Section */}
               <div className="flex-1 glass-card rounded-2xl p-6 border border-white/5 overflow-hidden flex flex-col">
                 <div className="flex items-center justify-between mb-4 shrink-0">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">

@@ -65,7 +65,6 @@ export function RunAutomationForm() {
         payload: parsedPayload,
         sessionId: paidSessionId 
       });
-      // Clear session after use
       localStorage.removeItem("stripe_session_id");
       setPaidSessionId(null);
       queryClient.invalidateQueries({ queryKey: [api.automation.list.path] });
@@ -81,7 +80,7 @@ export function RunAutomationForm() {
       id: 'lite',
       name: 'ASOF Lite',
       price: '$0.50',
-      description: 'Single checks & daily validation',
+      description: 'Single checks',
       icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
       color: 'emerald'
     },
@@ -89,7 +88,7 @@ export function RunAutomationForm() {
       id: 'pro',
       name: 'ASOF Pro',
       price: '$1.00',
-      description: 'High-risk decisions with evidence',
+      description: 'High-risk decisions',
       icon: <Zap className="w-4 h-4 text-blue-400" />,
       color: 'blue'
     },
@@ -97,7 +96,7 @@ export function RunAutomationForm() {
       id: 'max',
       name: 'ASOF Max',
       price: '$2.50',
-      description: 'Mission-critical multi-signal',
+      description: 'Mission-critical',
       icon: <ShieldCheck className="w-4 h-4 text-purple-400" />,
       color: 'purple'
     }
@@ -122,57 +121,89 @@ export function RunAutomationForm() {
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col gap-6">
+      <CardContent className="flex-1 flex flex-col gap-4">
         {isLocked ? (
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Select a Pricing Tier</p>
-            <div className="grid grid-cols-1 gap-3">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Select Pricing Tier</p>
+            <div className="grid grid-cols-1 gap-2">
               {tiers.map((tier) => (
                 <button
                   key={tier.id}
                   onClick={() => initiatePayment(tier.id)}
-                  className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left group w-full"
+                  className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left w-full group"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-${tier.color}-500/20`}>
+                  <div className="flex items-center gap-2">
+                    <div className={`p-1.5 rounded bg-${tier.color}-500/10`}>
                       {tier.icon}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-white">{tier.name}</h4>
-                      <p className="text-[10px] text-muted-foreground">{tier.description}</p>
+                      <h4 className="text-xs font-bold text-white leading-none">{tier.name}</h4>
+                      <p className="text-[9px] text-muted-foreground mt-1">{tier.description}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-sm font-bold text-white">{tier.price}</span>
-                    <p className="text-[10px] text-primary font-bold">Select</p>
+                    <span className="text-xs font-bold text-white">{tier.price}</span>
                   </div>
                 </button>
               ))}
             </div>
+            
+            <div className="mt-4 glass-card rounded-lg overflow-hidden border border-white/5 bg-black/20">
+              <table className="w-full text-[8px] text-left leading-tight">
+                <thead className="uppercase tracking-wider text-muted-foreground bg-white/5">
+                  <tr>
+                    <th className="px-2 py-1">Feature</th>
+                    <th className="px-1 py-1 text-center">L</th>
+                    <th className="px-1 py-1 text-center">P</th>
+                    <th className="px-1 py-1 text-center">M</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  <tr>
+                    <td className="px-2 py-1 text-muted-foreground">Verdict/Score</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1 text-muted-foreground">Evidence/Risk</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1 text-muted-foreground">Conflict/Pri</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6 flex-1 flex flex-col">
-            <div className="space-y-2">
-              <Label htmlFor="agentId" className="text-xs font-medium uppercase text-muted-foreground tracking-wider">
+          <form onSubmit={handleSubmit} className="space-y-4 flex-1 flex flex-col">
+            <div className="space-y-1">
+              <Label htmlFor="agentId" className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
                 Agent Identity
               </Label>
               <Input
                 id="agentId"
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                className="glass-input font-mono"
+                className="glass-input font-mono h-8 text-xs"
                 placeholder="e.g. agent-alpha-01"
                 required
               />
             </div>
 
-            <div className="space-y-2 flex-1 flex flex-col">
+            <div className="space-y-1 flex-1 flex flex-col">
               <div className="flex items-center justify-between">
-                <Label htmlFor="payload" className="text-xs font-medium uppercase text-muted-foreground tracking-wider">
+                <Label htmlFor="payload" className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
                   Operation Payload (JSON)
                 </Label>
                 {jsonError && (
-                  <span className="text-xs text-rose-400 font-medium animate-pulse">
+                  <span className="text-[9px] text-rose-400 font-medium animate-pulse">
                     {jsonError}
                   </span>
                 )}
@@ -181,7 +212,7 @@ export function RunAutomationForm() {
                 id="payload"
                 value={payload}
                 onChange={(e) => setPayload(e.target.value)}
-                className="glass-input font-mono text-xs flex-1 min-h-[200px] resize-none leading-relaxed"
+                className="glass-input font-mono text-[10px] flex-1 min-h-[150px] resize-none leading-relaxed"
                 spellCheck={false}
               />
             </div>
@@ -189,16 +220,16 @@ export function RunAutomationForm() {
             <Button 
               type="submit" 
               disabled={isRunning}
-              className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300"
+              className="w-full h-10 text-sm font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300"
             >
               {isRunning ? (
                 <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processing Signal...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
                 </>
               ) : (
                 <>
-                  <Play className="mr-2 h-5 w-5 fill-current" />
+                  <Play className="mr-2 h-4 w-4 fill-current" />
                   Execute Sequence
                 </>
               )}
@@ -212,21 +243,21 @@ export function RunAutomationForm() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 overflow-hidden"
+              className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 overflow-hidden mt-2"
             >
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                 <div>
-                  <h4 className="text-sm font-bold text-emerald-400 mb-1">Execution Successful</h4>
-                  <p className="text-sm text-emerald-100/70 mb-2">
+                  <h4 className="text-xs font-bold text-emerald-400 mb-0.5">Successful</h4>
+                  <p className="text-[10px] text-emerald-100/70 mb-1 leading-tight">
                     {data.data.insight}
                   </p>
                   {data.data.explanation && (
-                    <p className="text-xs text-emerald-100/50 italic mb-2">
+                    <p className="text-[9px] text-emerald-100/50 italic mb-1 leading-tight">
                       "{data.data.explanation}"
                     </p>
                   )}
-                  <div className="flex items-center gap-4 text-xs font-mono text-emerald-400/60">
+                  <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
                     <span>Conf: {(data.data.confidence * 100).toFixed(1)}%</span>
                     <span>{new Date(data.data.timestamp).toLocaleTimeString()}</span>
                   </div>
