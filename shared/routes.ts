@@ -47,6 +47,8 @@ export const api = {
           data: z.object({
             insight: z.string(),
             confidence: z.number(),
+            evidence: z.array(z.any()).optional(),
+            explanation: z.string().optional(),
             timestamp: z.string()
           })
         }),

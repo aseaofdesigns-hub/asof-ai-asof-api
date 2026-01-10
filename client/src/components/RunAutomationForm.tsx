@@ -221,6 +221,11 @@ export function RunAutomationForm() {
                   <p className="text-sm text-emerald-100/70 mb-2">
                     {data.data.insight}
                   </p>
+                  {data.data.explanation && (
+                    <p className="text-xs text-emerald-100/50 italic mb-2">
+                      "{data.data.explanation}"
+                    </p>
+                  )}
                   <div className="flex items-center gap-4 text-xs font-mono text-emerald-400/60">
                     <span>Conf: {(data.data.confidence * 100).toFixed(1)}%</span>
                     <span>{new Date(data.data.timestamp).toLocaleTimeString()}</span>
