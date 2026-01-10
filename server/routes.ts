@@ -24,6 +24,7 @@ export async function registerRoutes(
             WHERE p.metadata->>'tier' = ${tier}
             AND p.active = true
             AND pr.active = true
+            ORDER BY p.id DESC
             LIMIT 1`
       );
 

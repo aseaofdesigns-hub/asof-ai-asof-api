@@ -8,6 +8,16 @@ async function getCredentials() {
     return cachedCredentials;
   }
 
+  // First check for direct environment variable (for live keys)
+  if (process.env.STRIPE_SECRET_KEY) {
+    cachedCredentials = {
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+      secretKey: process.env.STRIPE_SECRET_KEY,
+    };
+    return cachedCredentials;
+  }
+
+  // Fall back to Replit connector for development
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY
