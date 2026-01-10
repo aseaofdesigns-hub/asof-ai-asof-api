@@ -63,6 +63,66 @@ export default function Dashboard() {
             </p>
           </div>
 
+          {/* Pricing Table */}
+          <div className="glass-card rounded-2xl overflow-hidden border border-white/5">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs uppercase tracking-wider text-muted-foreground bg-white/5">
+                  <tr>
+                    <th className="px-6 py-4">Feature</th>
+                    <th className="px-6 py-4">Lite ($0.50)</th>
+                    <th className="px-6 py-4">Pro ($1.00)</th>
+                    <th className="px-6 py-4">Max ($2.50)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  <tr className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-medium">AS-OF verdict</td>
+                    <td className="px-6 py-4">✅</td>
+                    <td className="px-6 py-4">✅</td>
+                    <td className="px-6 py-4">✅</td>
+                  </tr>
+                  <tr className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-medium">Confidence score</td>
+                    <td className="px-6 py-4">✅</td>
+                    <td className="px-6 py-4">✅</td>
+                    <td className="px-6 py-4">✅</td>
+                  </tr>
+                  <tr className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-medium">Evidence & explanations</td>
+                    <td className="px-6 py-4">❌</td>
+                    <td className="px-6 py-4">✅</td>
+                    <td className="px-6 py-4">✅</td>
+                  </tr>
+                  <tr className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-medium">Risk score</td>
+                    <td className="px-6 py-4">❌</td>
+                    <td className="px-6 py-4">✅</td>
+                    <td className="px-6 py-4">✅</td>
+                  </tr>
+                  <tr className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-medium">Strict mode</td>
+                    <td className="px-6 py-4">❌</td>
+                    <td className="px-6 py-4">✅</td>
+                    <td className="px-6 py-4">✅</td>
+                  </tr>
+                  <tr className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-medium">Conflict detection</td>
+                    <td className="px-6 py-4">❌</td>
+                    <td className="px-6 py-4">❌</td>
+                    <td className="px-6 py-4">✅</td>
+                  </tr>
+                  <tr className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-medium">Priority execution</td>
+                    <td className="px-6 py-4">❌</td>
+                    <td className="px-6 py-4">❌</td>
+                    <td className="px-6 py-4">✅</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* Status Banner */}
           <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
             <div className="flex items-center gap-4">
