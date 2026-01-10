@@ -33,6 +33,10 @@ export async function registerRoutes(
 
       const { price_id, unit_amount, name } = result.rows[0] as any;
 
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host || req.headers.origin?.replace(/^https?:\/\//, '');
+      const baseUrl = req.headers.origin || `${protocol}://${host}`;
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [{
@@ -40,8 +44,8 @@ export async function registerRoutes(
           quantity: 1,
         }],
         mode: 'payment',
-        success_url: `${req.headers.origin}/verify?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.headers.origin}/`,
+        success_url: `${baseUrl}/verify?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/`,
         metadata: {
           tier: tier
         }
