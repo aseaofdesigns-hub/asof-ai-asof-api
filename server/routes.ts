@@ -3,11 +3,9 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import Stripe from "stripe";
-
-const stripe = process.env.STRIPE_SECRET_KEY 
-  ? new Stripe(process.env.STRIPE_SECRET_KEY) 
-  : null;
+import { getUncachableStripeClient } from "./stripeClient";
+import { sql } from "drizzle-orm";
+import { db } from "./db";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -15,42 +13,49 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   app.post(api.payments.create.path, async (req, res) => {
-    if (!stripe) return res.status(500).json({ message: "Stripe not configured" });
-    
     try {
+      const stripe = await getUncachableStripeClient();
       const { tier } = api.payments.create.input.parse(req.body);
       
-      const prices = {
-        lite: { amount: 50, name: "ASOF Lite" },
-        pro: { amount: 100, name: "ASOF Pro" },
-        max: { amount: 250, name: "ASOF Max" }
-      };
+      const result = await db.execute(
+        sql`SELECT p.id as product_id, pr.id as price_id, p.name, pr.unit_amount
+            FROM stripe.products p
+            JOIN stripe.prices pr ON pr.product = p.id
+            WHERE p.metadata->>'tier' = ${tier}
+            AND p.active = true
+            AND pr.active = true
+            LIMIT 1`
+      );
 
-      const selected = prices[tier as keyof typeof prices];
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: `No price found for tier: ${tier}` });
+      }
+
+      const { price_id, unit_amount, name } = result.rows[0] as any;
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [{
-          price_data: {
-            currency: 'usd',
-            product_data: { name: selected.name },
-            unit_amount: selected.amount,
-          },
+          price: price_id,
           quantity: 1,
         }],
         mode: 'payment',
         success_url: `${req.headers.origin}/verify?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.headers.origin}/`,
+        metadata: {
+          tier: tier
+        }
       });
 
       await storage.createPayment({
         stripeSessionId: session.id,
-        amount: selected.amount,
+        amount: unit_amount as number,
         tier: tier
       });
 
       res.json({ url: session.url });
     } catch (err) {
+      console.error('Payment creation error:', err);
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid tier" });
       }
@@ -60,16 +65,18 @@ export async function registerRoutes(
 
   app.get(api.payments.verify.path, async (req, res) => {
     const { sessionId } = req.params;
-    if (!stripe) return res.status(500).json({ message: "Stripe not configured" });
 
     try {
+      const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
       if (session.payment_status === 'paid') {
         await storage.updatePaymentStatus(sessionId, 'paid');
         return res.json({ status: 'paid' });
       }
       res.json({ status: session.payment_status });
     } catch (err) {
+      console.error('Payment verification error:', err);
       res.status(404).json({ message: "Session not found" });
     }
   });
@@ -78,17 +85,11 @@ export async function registerRoutes(
     try {
       const { agent_id, payload, sessionId } = api.automation.run.input.parse(req.body);
 
-      let tier = "lite";
-      // Verify payment in storage
-      if (sessionId.startsWith("test-session-")) {
-        tier = sessionId.split("-")[2] || "lite";
-      } else {
-        const payment = await storage.getPaymentBySessionId(sessionId);
-        if (!payment || payment.status !== 'paid') {
-          return res.status(401).json({ message: "Payment required to run automation" });
-        }
-        tier = payment.tier;
+      const payment = await storage.getPaymentBySessionId(sessionId);
+      if (!payment || payment.status !== 'paid') {
+        return res.status(401).json({ message: "Payment required to run automation" });
       }
+      const tier = payment.tier;
 
       const result = {
         insight: `As-of signal processed (${tier.toUpperCase()} Tier)`,

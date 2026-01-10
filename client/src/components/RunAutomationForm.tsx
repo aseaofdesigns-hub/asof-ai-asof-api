@@ -35,12 +35,25 @@ export function RunAutomationForm() {
   }, []);
 
   const initiatePayment = async (tier: 'lite' | 'pro' | 'max') => {
-    // Development testing mode: Bypass Stripe
-    setPaidSessionId(`test-session-${tier}-${Date.now()}`);
-    toast({
-      title: "Test Mode Active",
-      description: `Bypassing Stripe for ${tier} tier testing.`,
-    });
+    try {
+      const res = await fetch(api.payments.create.path, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier })
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to initiate payment");
+      }
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Payment initialization failed",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {

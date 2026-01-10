@@ -13,7 +13,7 @@ export default function VerifyPayment() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<{ status: string }>({
     queryKey: [buildUrl(api.payments.verify.path, { sessionId: sessionId || "" })],
     enabled: !!sessionId,
     retry: 3,
