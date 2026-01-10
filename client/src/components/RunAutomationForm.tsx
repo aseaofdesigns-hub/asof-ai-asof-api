@@ -186,16 +186,23 @@ export function RunAutomationForm() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 flex-1 flex flex-col">
-            <div className="space-y-1">
-              <Label htmlFor="agentId" className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
-                Agent Identity
-              </Label>
+            <div className="space-y-2 p-3 rounded-lg bg-white/5 border border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <Label htmlFor="agentId" className="text-xs font-bold text-white">
+                  Your Agent ID
+                </Label>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Enter a unique identifier for your AI agent. This helps you track your automation history.
+              </p>
               <Input
                 id="agentId"
+                data-testid="input-agent-id"
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                className="glass-input font-mono h-8 text-xs"
-                placeholder="e.g. agent-alpha-01"
+                className="glass-input font-mono h-9 text-sm border-primary/30 focus:border-primary"
+                placeholder="e.g. my-trading-bot-01"
                 required
               />
             </div>
