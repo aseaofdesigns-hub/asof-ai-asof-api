@@ -63,66 +63,6 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Pricing Table */}
-          <div className="glass-card rounded-2xl overflow-hidden border border-white/5">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs uppercase tracking-wider text-muted-foreground bg-white/5">
-                  <tr>
-                    <th className="px-6 py-4">Feature</th>
-                    <th className="px-6 py-4">Lite ($0.50)</th>
-                    <th className="px-6 py-4">Pro ($1.00)</th>
-                    <th className="px-6 py-4">Max ($2.50)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium">AS-OF verdict</td>
-                    <td className="px-6 py-4">✅</td>
-                    <td className="px-6 py-4">✅</td>
-                    <td className="px-6 py-4">✅</td>
-                  </tr>
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium">Confidence score</td>
-                    <td className="px-6 py-4">✅</td>
-                    <td className="px-6 py-4">✅</td>
-                    <td className="px-6 py-4">✅</td>
-                  </tr>
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium">Evidence & explanations</td>
-                    <td className="px-6 py-4">❌</td>
-                    <td className="px-6 py-4">✅</td>
-                    <td className="px-6 py-4">✅</td>
-                  </tr>
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium">Risk score</td>
-                    <td className="px-6 py-4">❌</td>
-                    <td className="px-6 py-4">✅</td>
-                    <td className="px-6 py-4">✅</td>
-                  </tr>
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium">Strict mode</td>
-                    <td className="px-6 py-4">❌</td>
-                    <td className="px-6 py-4">✅</td>
-                    <td className="px-6 py-4">✅</td>
-                  </tr>
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium">Conflict detection</td>
-                    <td className="px-6 py-4">❌</td>
-                    <td className="px-6 py-4">❌</td>
-                    <td className="px-6 py-4">✅</td>
-                  </tr>
-                  <tr className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium">Priority execution</td>
-                    <td className="px-6 py-4">❌</td>
-                    <td className="px-6 py-4">❌</td>
-                    <td className="px-6 py-4">✅</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
           {/* Status Banner */}
           <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
             <div className="flex items-center gap-4">
@@ -208,6 +148,54 @@ export default function Dashboard() {
                  <div className="h-[160px] w-full">
                    <ConfidenceChart />
                  </div>
+              </div>
+
+              {/* Pricing Table (Moved and Resized) */}
+              <div className="glass-card rounded-2xl overflow-hidden border border-white/5">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px] text-left">
+                    <thead className="uppercase tracking-wider text-muted-foreground bg-white/5">
+                      <tr>
+                        <th className="px-4 py-2">Feature</th>
+                        <th className="px-4 py-2 text-center">Lite</th>
+                        <th className="px-4 py-2 text-center">Pro</th>
+                        <th className="px-4 py-2 text-center">Max</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      <tr className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-2 font-medium">Verdict</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                      </tr>
+                      <tr className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-2 font-medium">Score</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                      </tr>
+                      <tr className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-2 font-medium">Evidence</td>
+                        <td className="px-4 py-2 text-center">❌</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                      </tr>
+                      <tr className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-2 font-medium">Strict/Risk</td>
+                        <td className="px-4 py-2 text-center">❌</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                      </tr>
+                      <tr className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-2 font-medium">Conflict/Pri</td>
+                        <td className="px-4 py-2 text-center">❌</td>
+                        <td className="px-4 py-2 text-center">❌</td>
+                        <td className="px-4 py-2 text-center">✅</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Table Section */}
