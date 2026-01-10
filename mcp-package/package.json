@@ -1,0 +1,30 @@
+{
+  "name": "asof-ai-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for ASOF.ai validation service - validate assumptions, signals, and datasets",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "asof-ai-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "validation",
+    "asof",
+    "claude",
+    "chatgpt"
+  ],
+  "author": "ASOF.ai",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
