@@ -39,45 +39,17 @@ Tiers:
               type: "string",
               description: "Unique identifier for your AI agent",
             },
-            claim: {
-              type: "string",
-              description: "The assertion you want to validate (e.g., 'This market data is still current')",
-            },
-            subject_id: {
-              type: "string",
-              description: "ID of the subject being validated",
-            },
-            subject_type: {
-              type: "string",
-              description: "Type of subject (e.g., 'market_data', 'regulation', 'dataset')",
-            },
-            subject_label: {
-              type: "string",
-              description: "Human-readable label for the subject",
-            },
-            max_age_seconds: {
-              type: "number",
-              description: "Maximum acceptable age in seconds before data is considered stale",
+            payload: {
+              type: "object",
+              description: "JSON object containing the data to validate (any structure)",
+              additionalProperties: true,
             },
             session_id: {
               type: "string",
               description: "Stripe checkout session ID (must be paid)",
             },
-            context_domain: {
-              type: "string",
-              description: "Optional: Domain context (e.g., 'finance', 'compliance')",
-            },
-            context_jurisdiction: {
-              type: "string",
-              description: "Optional: Jurisdiction (e.g., 'US-NY', 'EU')",
-            },
-            risk_tolerance: {
-              type: "string",
-              enum: ["low", "medium", "high"],
-              description: "Optional: Risk tolerance level",
-            },
           },
-          required: ["agent_id", "claim", "subject_id", "subject_type", "session_id"],
+          required: ["agent_id", "payload", "session_id"],
         },
       },
       {
@@ -138,7 +110,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: "text",
-              text: `Error creating payment session: ${error.message || "Unknown error"}`,
+              text: JSON.stringify({
+                success: false,
+                error: error.message || "Unknown error",
+              }),
             },
           ],
         };
@@ -149,11 +124,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [
           {
             type: "text",
-            text: `Payment session created successfully.
-
-Checkout URL: ${data.url}
-
-Please direct the user to complete payment at this URL. After payment, they will be redirected with a session_id parameter that you can use with the validate_asof tool.`,
+            text: JSON.stringify({
+              success: true,
+              checkout_url: data.url,
+              instructions: "Direct user to checkout_url to complete payment. After payment, extract session_id from the redirect URL query parameter.",
+            }),
           },
         ],
       };
@@ -169,7 +144,10 @@ Please direct the user to complete payment at this URL. After payment, they will
           content: [
             {
               type: "text",
-              text: "Session not found or invalid session ID.",
+              text: JSON.stringify({
+                success: false,
+                error: "Session not found or invalid session ID",
+              }),
             },
           ],
         };
@@ -180,43 +158,27 @@ Please direct the user to complete payment at this URL. After payment, they will
         content: [
           {
             type: "text",
-            text: `Payment status: ${data.status}${data.status === "paid" ? "\n\nYou can now use this session_id with the validate_asof tool." : ""}`,
+            text: JSON.stringify({
+              success: true,
+              status: data.status,
+              can_validate: data.status === "paid",
+            }),
           },
         ],
       };
     }
 
     if (name === "validate_asof") {
-      const payload = {
-        agent_id: args?.agent_id,
-        payload: {
-          asof: {
-            claim: args?.claim,
-            subject: {
-              id: args?.subject_id,
-              type: args?.subject_type,
-              label: args?.subject_label || args?.subject_id,
-            },
-            freshness: {
-              max_age_seconds: args?.max_age_seconds || 3600,
-              last_verified_at: new Date().toISOString(),
-            },
-            ...(args?.context_domain && {
-              context: {
-                domain: args?.context_domain,
-                jurisdiction: args?.context_jurisdiction,
-                risk_tolerance: args?.risk_tolerance,
-              },
-            }),
-          },
-        },
-        sessionId: args?.session_id,
+      const requestBody = {
+        agent_id: String(args?.agent_id || ""),
+        payload: args?.payload || {},
+        sessionId: String(args?.session_id || ""),
       };
 
       const response = await fetch(`${baseUrl}/api/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -225,37 +187,22 @@ Please direct the user to complete payment at this URL. After payment, they will
           content: [
             {
               type: "text",
-              text: `Validation failed: ${error.message || "Unknown error"}`,
+              text: JSON.stringify({
+                success: false,
+                error: error.message || "Unknown error",
+                field: error.field,
+              }),
             },
           ],
         };
       }
 
       const result = await response.json();
-      const data = result.data;
-
-      let responseText = `ASOF Validation Result
-━━━━━━━━━━━━━━━━━━━━━━
-Insight: ${data.insight}
-Confidence: ${(data.confidence * 100).toFixed(1)}%
-Timestamp: ${data.timestamp}`;
-
-      if (data.explanation) {
-        responseText += `\n\nExplanation: ${data.explanation}`;
-      }
-
-      if (data.evidence && data.evidence.length > 0) {
-        responseText += `\n\nEvidence:`;
-        for (const e of data.evidence) {
-          responseText += `\n  - ${e.name}: ${e.value} (weight: ${e.weight})`;
-        }
-      }
-
       return {
         content: [
           {
             type: "text",
-            text: responseText,
+            text: JSON.stringify(result, null, 2),
           },
         ],
       };

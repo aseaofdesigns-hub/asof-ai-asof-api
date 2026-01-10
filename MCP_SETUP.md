@@ -68,18 +68,38 @@ Claude will:
 Validates an assumption or data point.
 
 **Required Parameters:**
-- `agent_id` - Your AI agent identifier
-- `claim` - The assertion to validate
-- `subject_id` - ID of the subject being validated
-- `subject_type` - Type of subject (e.g., "market_data", "regulation")
-- `session_id` - Paid Stripe session ID
+- `agent_id` - Your AI agent identifier (string)
+- `payload` - JSON object containing the data to validate (any structure)
+- `session_id` - Paid Stripe session ID (string)
 
-**Optional Parameters:**
-- `subject_label` - Human-readable label
-- `max_age_seconds` - Maximum acceptable age (default: 3600)
-- `context_domain` - Domain context (e.g., "finance")
-- `context_jurisdiction` - Jurisdiction (e.g., "US-NY")
-- `risk_tolerance` - "low", "medium", or "high"
+**Example payload:**
+```json
+{
+  "agent_id": "my-agent-001",
+  "payload": {
+    "claim": "S&P 500 closing price is still current",
+    "subject": {
+      "id": "sp500-close",
+      "type": "market_data"
+    }
+  },
+  "session_id": "cs_live_xxx"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "insight": "As-of signal processed (PRO Tier)",
+    "confidence": 0.92,
+    "evidence": [...],
+    "explanation": "Signal verified against primary and secondary sources.",
+    "timestamp": "2025-01-10T12:00:00.000Z"
+  }
+}
+```
 
 ### create_payment_session
 
@@ -88,6 +108,15 @@ Creates a Stripe checkout for validation credits.
 **Required Parameters:**
 - `tier` - "lite" ($0.50), "pro" ($1.00), or "max" ($2.50)
 
+**Response:**
+```json
+{
+  "success": true,
+  "checkout_url": "https://checkout.stripe.com/...",
+  "instructions": "Direct user to checkout_url to complete payment."
+}
+```
+
 ### check_payment_status
 
 Checks if a payment has been completed.
@@ -95,8 +124,18 @@ Checks if a payment has been completed.
 **Required Parameters:**
 - `session_id` - Stripe checkout session ID
 
+**Response:**
+```json
+{
+  "success": true,
+  "status": "paid",
+  "can_validate": true
+}
+```
+
 ## Security Notes
 
 - The MCP server runs locally and connects to your published ASOF.ai instance
 - API keys and secrets are managed by the server, not exposed to AI agents
 - Payment verification prevents unauthorized validation requests
+- All tool responses return structured JSON for reliable parsing
