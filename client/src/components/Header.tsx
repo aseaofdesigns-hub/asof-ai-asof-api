@@ -1,4 +1,4 @@
-import { Cpu, Activity } from "lucide-react";
+import { Cpu, Activity, Code2 } from "lucide-react";
 import { Link } from "wouter";
 
 export function Header() {
@@ -26,6 +26,10 @@ export function Header() {
           </Link>
           <Link href="/contact" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
             Contact
+          </Link>
+          <Link href="/docs" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1" data-testid="link-api-docs">
+            <Code2 className="w-3 h-3" />
+            API
           </Link>
           <div className="h-4 w-px bg-white/10" />
           <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
