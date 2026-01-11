@@ -1,0 +1,243 @@
+Update ONLY openapi.json (docs only). Do NOT change runtime code.
+
+1) In openapi.json under components.schemas add these schemas (merge, don't delete others):
+
+
+{
+  "AsOfTier": { "type": "string", "enum": ["lite", "pro", "max"] },
+  "AsOfVerdict": { "type": "string", "enum": ["VALID", "INVALID", "CONFLICTED", "UNKNOWN", "STALE"] },
+  "AsOfRiskLevel": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+
+  "AsOfSignalInput": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "source": { "type": "string" },
+      "priority": { "type": "number" },
+      "assertion": { "type": "string" },
+      "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+      "last_verified_at": { "type": "string", "format": "date-time" }
+    },
+    "required": ["source", "priority", "assertion", "confidence", "last_verified_at"]
+  },
+
+  "AsOfCheck": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "freshness_window_seconds": { "type": "number" },
+      "signals": { "type": "array", "items": { "$ref": "#/components/schemas/AsOfSignalInput" } },
+      "recommended_actions": { "type": "array", "items": { "type": "string" } },
+      "conflict_rules": { "type": "object", "additionalProperties": true }
+    },
+    "required": ["signals"]
+  },
+
+  "RunRequest": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "agent_id": { "type": "string" },
+      "sessionId": { "type": "string", "description": "Paid Stripe session id (camelCase)" },
+      "payload": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "type": { "type": "string" },
+          "assumption": { "type": "string" },
+          "claim": { "type": "string" },
+          "dataset_name": { "type": "string" },
+          "last_trained": { "type": "string" },
+          "asof_check": { "$ref": "#/components/schemas/AsOfCheck" }
+        }
+      }
+    },
+    "required": ["agent_id", "sessionId", "payload"]
+  },
+
+  "AsOfEvidenceItem": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "source": { "type": "string" },
+      "assertion": { "type": "string" },
+      "last_verified_at": { "type": ["string","null"], "format": "date-time" },
+      "priority": { "type": "number" },
+      "signal_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+    },
+    "required": ["source","assertion","last_verified_at","priority","signal_confidence"]
+  },
+
+  "AsOfConflict": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "between": { "type": "array", "items": { "type": "string" } },
+      "type": { "type": "string" },
+      "detail": { "type": "string" }
+    },
+    "required": ["between","type","detail"]
+  },
+
+  "AsOfWinningSignal": {
+    "type": ["object","null"],
+    "additionalProperties": false,
+    "properties": {
+      "source": { "type": "string" },
+      "score": { "type": "number" },
+      "reason": { "type": "string" }
+    },
+    "required": ["source","score","reason"]
+  },
+
+  "RunResponseDataLite": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "tier": { "$ref": "#/components/schemas/AsOfTier" },
+      "assumption_verdict": { "$ref": "#/components/schemas/AsOfVerdict" },
+      "assumption_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+      "timestamp": { "type": "string", "format": "date-time" }
+    },
+    "required": ["tier","assumption_verdict","assumption_confidence","timestamp"]
+  },
+
+  "RunResponseDataPro": {
+    "allOf": [
+      { "$ref": "#/components/schemas/RunResponseDataLite" },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "explanation": { "type": "string" },
+          "evidence": { "type": "array", "items": { "$ref": "#/components/schemas/AsOfEvidenceItem" } }
+        },
+        "required": ["explanation","evidence"]
+      }
+    ]
+  },
+
+  "RunResponseDataMax": {
+    "allOf": [
+      { "$ref": "#/components/schemas/RunResponseDataPro" },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "signal_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "risk_level": { "$ref": "#/components/schemas/AsOfRiskLevel" },
+          "key_findings": { "type": "array", "items": { "type": "string" } },
+          "recommended_actions": { "type": "array", "items": { "type": "string" } },
+          "conflicts": { "type": "array", "items": { "$ref": "#/components/schemas/AsOfConflict" } },
+          "winning_signal": { "$ref": "#/components/schemas/AsOfWinningSignal" }
+        },
+        "required": ["signal_confidence","risk_level","key_findings","recommended_actions","conflicts","winning_signal"]
+      }
+    ]
+  },
+
+  "RunResponse": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "success": { "type": "boolean" },
+      "data": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/RunResponseDataLite" },
+          { "$ref": "#/components/schemas/RunResponseDataPro" },
+          { "$ref": "#/components/schemas/RunResponseDataMax" }
+        ]
+      }
+    },
+    "required": ["success","data"]
+  },
+
+  "ErrorResponse": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "message": { "type": "string" },
+      "field": { "type": "string" }
+    }
+  }
+}
+2) In openapi.json under paths add/merge these 3 endpoints:
+
+{
+  "/api/create-payment": {
+    "post": {
+      "summary": "Create Stripe checkout session",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "tier": { "$ref": "#/components/schemas/AsOfTier" } },
+              "required": ["tier"]
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Checkout session created",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": { "url": { "type": "string" } },
+                "required": ["url"]
+              }
+            }
+          }
+        },
+        "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+      }
+    }
+  },
+
+  "/api/verify-payment/{sessionId}": {
+    "get": {
+      "summary": "Verify Stripe payment status",
+      "parameters": [
+        { "name": "sessionId", "in": "path", "required": true, "schema": { "type": "string" } }
+      ],
+      "responses": {
+        "200": {
+          "description": "Payment status",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": { "status": { "type": "string" } },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        "404": { "description": "Session not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+      }
+    }
+  },
+
+  "/api/run": {
+    "post": {
+      "summary": "Run ASOF validation (tiered output)",
+      "requestBody": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RunRequest" } } }
+      },
+      "responses": {
+        "200": { "description": "Validation result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RunResponse" } } } },
+        "401": { "description": "Payment required", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+        "400": { "description": "Invalid request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+      }
+    }
+  }
+}
+
+Done. Save openapi.json. No other file changes.

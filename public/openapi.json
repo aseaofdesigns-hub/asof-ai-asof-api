@@ -29,8 +29,7 @@
   "paths": {
     "/api/create-payment": {
       "post": {
-        "summary": "Create Payment Session",
-        "description": "Create a Stripe checkout session to purchase validation credits. Returns a URL to redirect the user to complete payment.",
+        "summary": "Create Stripe checkout session",
         "operationId": "createPayment",
         "tags": ["Payments"],
         "requestBody": {
@@ -39,74 +38,36 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["tier"],
+                "additionalProperties": false,
                 "properties": {
-                  "tier": {
-                    "type": "string",
-                    "enum": ["lite", "pro", "max"],
-                    "description": "Pricing tier - lite ($0.50), pro ($1.00), or max ($2.50)"
-                  }
-                }
-              },
-              "examples": {
-                "lite": {
-                  "value": { "tier": "lite" }
+                  "tier": { "$ref": "#/components/schemas/AsOfTier" }
                 },
-                "pro": {
-                  "value": { "tier": "pro" }
-                },
-                "max": {
-                  "value": { "tier": "max" }
-                }
+                "required": ["tier"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Checkout session created successfully",
+            "description": "Checkout session created",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": false,
                   "properties": {
-                    "url": {
-                      "type": "string",
-                      "format": "uri",
-                      "description": "Stripe checkout URL to redirect user"
-                    }
-                  }
+                    "url": { "type": "string" }
+                  },
+                  "required": ["url"]
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid tier specified",
+            "description": "Invalid request",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Price not found for tier",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFoundError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Failed to create checkout session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalError"
-                }
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
               }
             }
           }
@@ -115,8 +76,7 @@
     },
     "/api/verify-payment/{sessionId}": {
       "get": {
-        "summary": "Verify Payment Status",
-        "description": "Check the payment status of a Stripe checkout session",
+        "summary": "Verify Stripe payment status",
         "operationId": "verifyPayment",
         "tags": ["Payments"],
         "parameters": [
@@ -124,26 +84,21 @@
             "name": "sessionId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Stripe checkout session ID"
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
           "200": {
-            "description": "Payment status retrieved",
+            "description": "Payment status",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": false,
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["paid", "unpaid", "pending"],
-                      "description": "Current payment status"
-                    }
-                  }
+                    "status": { "type": "string" }
+                  },
+                  "required": ["status"]
                 }
               }
             }
@@ -152,9 +107,7 @@
             "description": "Session not found",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFoundError"
-                }
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
               }
             }
           }
@@ -163,107 +116,39 @@
     },
     "/api/run": {
       "post": {
-        "summary": "Run Validation",
-        "description": "Submit data for as-of validation. Requires a paid Stripe session. Returns a verdict with confidence score and optional evidence based on tier.",
+        "summary": "Run ASOF validation (tiered output)",
         "operationId": "runValidation",
         "tags": ["Validation"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ValidationRequest"
-              },
-              "examples": {
-                "basic": {
-                  "summary": "Basic validation request",
-                  "value": {
-                    "agent_id": "my-trading-bot",
-                    "payload": {
-                      "asof": {
-                        "claim": "Market data is still current",
-                        "subject": {
-                          "id": "aapl-price",
-                          "type": "market_data",
-                          "label": "AAPL Stock Price"
-                        },
-                        "freshness": {
-                          "max_age_seconds": 300,
-                          "last_verified_at": "2026-01-10T12:00:00Z"
-                        }
-                      }
-                    },
-                    "sessionId": "cs_live_xxx"
-                  }
-                },
-                "compliance": {
-                  "summary": "Compliance validation with context",
-                  "value": {
-                    "agent_id": "compliance-checker",
-                    "payload": {
-                      "asof": {
-                        "claim": "Regulatory requirement is enforceable",
-                        "subject": {
-                          "id": "reg-8842",
-                          "type": "regulation",
-                          "label": "SEC Rule 8842"
-                        },
-                        "context": {
-                          "domain": "finance",
-                          "jurisdiction": "US-NY",
-                          "risk_tolerance": "low"
-                        },
-                        "freshness": {
-                          "stale_after": "2026-01-15T00:00:00Z",
-                          "max_age_seconds": 86400
-                        }
-                      }
-                    },
-                    "sessionId": "cs_live_xxx"
-                  }
-                }
-              }
+              "schema": { "$ref": "#/components/schemas/RunRequest" }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Validation completed successfully",
+            "description": "Validation result",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request body",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
-                }
+                "schema": { "$ref": "#/components/schemas/RunResponse" }
               }
             }
           },
           "401": {
-            "description": "Payment required - session not paid or invalid",
+            "description": "Payment required",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedError"
-                }
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
               }
             }
           },
-          "500": {
-            "description": "Internal server error",
+          "400": {
+            "description": "Invalid request",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalError"
-                }
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
               }
             }
           }
@@ -296,199 +181,199 @@
   },
   "components": {
     "schemas": {
-      "ValidationRequest": {
+      "AsOfTier": {
+        "type": "string",
+        "enum": ["lite", "pro", "max"]
+      },
+      "AsOfVerdict": {
+        "type": "string",
+        "enum": ["VALID", "INVALID", "CONFLICTED", "UNKNOWN", "STALE"]
+      },
+      "AsOfRiskLevel": {
+        "type": "string",
+        "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+      },
+      "AsOfSignalInput": {
         "type": "object",
-        "required": ["agent_id", "payload", "sessionId"],
+        "additionalProperties": false,
         "properties": {
-          "agent_id": {
+          "source": { "type": "string" },
+          "priority": { "type": "number" },
+          "assertion": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "last_verified_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["source", "priority", "assertion", "confidence", "last_verified_at"]
+      },
+      "AsOfCheck": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "freshness_window_seconds": { "type": "number" },
+          "signals": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AsOfSignalInput" }
+          },
+          "recommended_actions": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "conflict_rules": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": ["signals"]
+      },
+      "RunRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "agent_id": { "type": "string" },
+          "sessionId": {
             "type": "string",
-            "description": "Unique identifier for the AI agent making the request"
+            "description": "Paid Stripe session id (camelCase)"
           },
           "payload": {
             "type": "object",
-            "description": "The data to validate",
+            "additionalProperties": true,
             "properties": {
-              "asof": {
-                "type": "object",
-                "properties": {
-                  "claim": {
-                    "type": "string",
-                    "description": "The assertion being validated"
-                  },
-                  "subject": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "string" },
-                      "type": { "type": "string" },
-                      "label": { "type": "string" }
-                    }
-                  },
-                  "freshness": {
-                    "type": "object",
-                    "properties": {
-                      "stale_after": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "max_age_seconds": {
-                        "type": "integer"
-                      },
-                      "last_verified_at": {
-                        "type": "string",
-                        "format": "date-time"
-                      }
-                    }
-                  },
-                  "context": {
-                    "type": "object",
-                    "properties": {
-                      "domain": { "type": "string" },
-                      "jurisdiction": { "type": "string" },
-                      "risk_tolerance": {
-                        "type": "string",
-                        "enum": ["low", "medium", "high"]
-                      }
-                    }
-                  },
-                  "signals": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "name": { "type": "string" },
-                        "value": {},
-                        "weight": { "type": "number" }
-                      }
-                    }
-                  }
-                }
-              }
+              "type": { "type": "string" },
+              "assumption": { "type": "string" },
+              "claim": { "type": "string" },
+              "dataset_name": { "type": "string" },
+              "last_trained": { "type": "string" },
+              "asof_check": { "$ref": "#/components/schemas/AsOfCheck" }
             }
-          },
-          "sessionId": {
-            "type": "string",
-            "description": "Stripe checkout session ID (must be paid)"
           }
-        }
+        },
+        "required": ["agent_id", "sessionId", "payload"]
       },
-      "ValidationResponse": {
+      "AsOfEvidenceItem": {
         "type": "object",
+        "additionalProperties": false,
         "properties": {
-          "success": {
-            "type": "boolean"
+          "source": { "type": "string" },
+          "assertion": { "type": "string" },
+          "last_verified_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
           },
-          "data": {
+          "priority": { "type": "number" },
+          "signal_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "required": ["source", "assertion", "last_verified_at", "priority", "signal_confidence"]
+      },
+      "AsOfConflict": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "between": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "type": { "type": "string" },
+          "detail": { "type": "string" }
+        },
+        "required": ["between", "type", "detail"]
+      },
+      "AsOfWinningSignal": {
+        "type": ["object", "null"],
+        "additionalProperties": false,
+        "properties": {
+          "source": { "type": "string" },
+          "score": { "type": "number" },
+          "reason": { "type": "string" }
+        },
+        "required": ["source", "score", "reason"]
+      },
+      "RunResponseDataLite": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tier": { "$ref": "#/components/schemas/AsOfTier" },
+          "assumption_verdict": { "$ref": "#/components/schemas/AsOfVerdict" },
+          "assumption_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["tier", "assumption_verdict", "assumption_confidence", "timestamp"]
+      },
+      "RunResponseDataPro": {
+        "allOf": [
+          { "$ref": "#/components/schemas/RunResponseDataLite" },
+          {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
-              "insight": {
-                "type": "string",
-                "description": "Summary of the validation result"
-              },
-              "confidence": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1,
-                "description": "Confidence score (0.87 for Lite, 0.92 for Pro, 0.98 for Max)"
-              },
+              "explanation": { "type": "string" },
               "evidence": {
                 "type": "array",
-                "description": "Evidence array (Pro and Max tiers only)",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "name": { "type": "string" },
-                    "value": {},
-                    "weight": { "type": "number" }
-                  }
-                }
-              },
-              "explanation": {
-                "type": "string",
-                "description": "Detailed explanation (Pro and Max tiers only)"
-              },
-              "timestamp": {
-                "type": "string",
-                "format": "date-time"
+                "items": { "$ref": "#/components/schemas/AsOfEvidenceItem" }
               }
-            }
+            },
+            "required": ["explanation", "evidence"]
           }
+        ]
+      },
+      "RunResponseDataMax": {
+        "allOf": [
+          { "$ref": "#/components/schemas/RunResponseDataPro" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "signal_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+              "risk_level": { "$ref": "#/components/schemas/AsOfRiskLevel" },
+              "key_findings": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "recommended_actions": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "conflicts": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/AsOfConflict" }
+              },
+              "winning_signal": { "$ref": "#/components/schemas/AsOfWinningSignal" }
+            },
+            "required": ["signal_confidence", "risk_level", "key_findings", "recommended_actions", "conflicts", "winning_signal"]
+          }
+        ]
+      },
+      "RunResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/RunResponseDataLite" },
+              { "$ref": "#/components/schemas/RunResponseDataPro" },
+              { "$ref": "#/components/schemas/RunResponseDataMax" }
+            ]
+          }
+        },
+        "required": ["success", "data"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "message": { "type": "string" },
+          "field": { "type": "string" }
         }
       },
       "Signal": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "agentId": {
-            "type": "string"
-          },
-          "payload": {
-            "type": "object"
-          },
-          "insight": {
-            "type": "string"
-          },
-          "confidence": {
-            "type": "number"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ValidationError": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "Error message describing the validation issue"
-          },
-          "field": {
-            "type": "string",
-            "description": "The field that failed validation (optional)"
-          }
-        },
-        "required": ["message"]
-      },
-      "UnauthorizedError": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "Error message explaining authorization failure"
-          }
-        },
-        "required": ["message"],
-        "example": {
-          "message": "Payment required to run automation"
-        }
-      },
-      "NotFoundError": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "Error message explaining what was not found"
-          }
-        },
-        "required": ["message"],
-        "example": {
-          "message": "Session not found"
-        }
-      },
-      "InternalError": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "Internal server error message"
-          }
-        },
-        "required": ["message"],
-        "example": {
-          "message": "Failed to create checkout session"
+          "id": { "type": "integer" },
+          "agentId": { "type": "string" },
+          "payload": { "type": "object" },
+          "insight": { "type": "string" },
+          "confidence": { "type": "number" },
+          "timestamp": { "type": "string", "format": "date-time" }
         }
       }
     }
