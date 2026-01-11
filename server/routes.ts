@@ -209,28 +209,50 @@ function evaluateMax(payload: AsOfPayload, nowIso: string) {
   }
 
   if (type === "policy_claim") {
-    const fixed = scored.some((s) => has(s.assertion, /\b1\s*[-–]?\s*3\b|\b1\s*to\s*3\b/));
-    const exceed = scored.some((s) => has(s.assertion, /vary|exceed|more than|longer|4\s*[-–]?\s*6|4\s*to\s*6/));
-    if (fixed && exceed) {
+    const fixed = scored.some((s) =>
+      /\b1\s*(?:-|–|to)\s*3\b/.test(txt(s.assertion)) ||
+      /\b1\s*[-–]\s*3\b/.test(txt(s.assertion))
+    );
+
+    const exceeds = scored.some((s) =>
+      /vary|varies|exceed|exceeds|more than|longer|delays|4\s*(?:-|–|to)\s*6/.test(txt(s.assertion))
+    );
+
+    if (fixed && exceeds) {
       assumption_verdict = "CONFLICTED";
       risk_level = "HIGH";
-      key_findings = ["Signals conflict: fixed timeframe vs sources indicating variability/exceeding 3 days."];
+
+      key_findings = [
+        "Conflicting signals: service standard suggests a fixed window, but other sources indicate delivery can exceed that window."
+      ];
+
       conflicts.push({
         between: ["fixed_timeframe", "variability_or_delay"],
         type: "assertion_conflict",
-        detail: "One signal states a fixed delivery window; another indicates it can exceed that window."
+        detail:
+          "At least one signal claims a fixed delivery window (e.g., 1-3 days) while another indicates variability or exceeding 3 days (e.g., 4-6 days)."
       });
-      if (!recommended_actions.length) recommended_actions = ["AVOID_HARDCODING", "USE_RANGE_WITH_CAVEATS"];
+
+      if (!recommended_actions.length) {
+        recommended_actions = ["AVOID_HARDCODING", "USE_RANGE_WITH_CAVEATS"];
+      }
     } else if (fixed) {
       assumption_verdict = "VALID";
       risk_level = "MEDIUM";
-      key_findings = ["Signals support a standard delivery window, but monitor for exceptions."];
+      key_findings = ["Signals support a service standard delivery window, but exceptions may apply."];
       if (!recommended_actions.length) recommended_actions = ["ADD_CAVEATS", "MONITOR"];
+    } else {
+      assumption_verdict = "UNKNOWN";
+      risk_level = "MEDIUM";
+      key_findings = ["No clear service-standard window detected in provided signals."];
+      if (!recommended_actions.length) recommended_actions = ["PROVIDE_BETTER_SIGNALS"];
     }
   }
 
   let assumption_confidence = clamp01(0.55 + (winner?.score ?? 0) * 0.35 + separation * 0.3);
-  if (assumption_verdict === "CONFLICTED") assumption_confidence = clamp01(assumption_confidence * 0.8);
+  if (assumption_verdict === "CONFLICTED") {
+    assumption_confidence = Math.min(0.65, assumption_confidence * 0.75);
+  }
   if (assumption_verdict === "UNKNOWN") assumption_confidence = 0.5;
 
   const explanation =
