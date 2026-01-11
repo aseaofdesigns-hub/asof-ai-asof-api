@@ -658,7 +658,15 @@ console.log(data.data.confidence); // 0.98 for MAX tier`;
 
           <div className="text-center py-8 text-sm text-muted-foreground">
             Questions? Contact us at{" "}
-            <a href="mailto:Support@asofai.com" className="text-primary hover:underline">
+            <a 
+              href="mailto:Support@asofai.com" 
+              className="text-primary hover:underline cursor-pointer"
+              data-testid="link-email-docs"
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.href = "mailto:Support@asofai.com";
+              }}
+            >
               Support@asofai.com
             </a>
           </div>
