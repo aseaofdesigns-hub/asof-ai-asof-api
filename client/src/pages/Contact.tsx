@@ -40,7 +40,7 @@ export default function Contact() {
 
           <div className="grid md:grid-cols-2 gap-12">
             <motion.div variants={item} className="space-y-8">
-              <div className="glass-card p-6 rounded-2xl border border-white/5 flex items-center gap-4">
+              <a href="mailto:Support@asofai.com" className="glass-card p-6 rounded-2xl border border-white/5 flex items-center gap-4 hover:border-primary/30 transition-colors" data-testid="link-email-support">
                 <div className="bg-primary/20 p-3 rounded-xl">
                   <Mail className="w-6 h-6 text-primary" />
                 </div>
@@ -48,7 +48,7 @@ export default function Contact() {
                   <h3 className="font-bold">Email Support</h3>
                   <p className="text-sm text-muted-foreground">Support@asofai.com</p>
                 </div>
-              </div>
+              </a>
 
               <div className="glass-card p-6 rounded-2xl border border-white/5 flex items-center gap-4">
                 <div className="bg-purple-500/20 p-3 rounded-xl">
