@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
-import { ShieldCheck, Zap, Globe, Cpu } from "lucide-react";
+import { ShieldCheck, Zap, Globe, AlertTriangle } from "lucide-react";
 
 export default function About() {
   const container = {
@@ -73,6 +73,20 @@ export default function About() {
               <p className="text-muted-foreground leading-relaxed text-lg">
                 To build the infrastructure for a world where billions of autonomous agents can interact securely, knowing that every assumption they hold has been verified "as of" right now.
               </p>
+            </div>
+          </motion.div>
+
+          <motion.div variants={item} className="p-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 backdrop-blur-sm">
+            <div className="flex items-start gap-4">
+              <div className="bg-amber-500/20 p-2 rounded-lg shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-bold text-amber-400">Verification Layer, Not a Replacement</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  ASOF.ai is a verification layer, not a replacement for reasoning or search. ASOF.ai verifies whether assumptions are still valid as of now. Always review your code, data pipelines, and system logic to ensure they correctly apply validated assumptions.
+                </p>
+              </div>
             </div>
           </motion.div>
         </motion.div>
