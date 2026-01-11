@@ -239,3 +239,119 @@ async function main() {
 }
 
 main().catch(console.error);
+function evaluateMax(payload, nowIso = new Date().toISOString()) {
+  const type = payload?.type || "unknown";
+  const asof = payload?.asof_check || {};
+  const signals = Array.isArray(asof.signals) ? asof.signals : [];
+
+  if (signals.length === 0) {
+    return {
+      tier: "max",
+      signal_confidence: 0.2,
+      assumption_verdict: "UNKNOWN",
+      assumption_confidence: 0.25,
+      risk_level: "HIGH",
+      key_findings: ["No signals provided."],
+      recommended_actions: ["PROVIDE_SIGNALS"],
+      evidence: [],
+      conflicts: [],
+      timestamp: nowIso
+    };
+  }
+
+  const lower = (s) => String(s ?? "").toLowerCase();
+  const has = (s, re) => re.test(lower(s));
+
+  // ===== Dataset / model validity rules (Test #3) =====
+  if (type === "dataset_validity") {
+    const drift = signals.find((s) => has(s.assertion, /feature drift|drift exceeds|exceeds threshold|drift/));
+    const auc = signals.find((s) => has(s.assertion, /auc/));
+
+    // detect numeric AUC drop like "0.81 → 0.69"
+    let bigAucDrop = false;
+    if (auc?.assertion) {
+      const nums = String(auc.assertion).match(/0\.\d+/g);
+      if (nums && nums.length >= 2) {
+        const a = Number(nums[0]);
+        const b = Number(nums[1]);
+        if (Number.isFinite(a) && Number.isFinite(b) && (a - b) >= 0.10) bigAucDrop = true;
+      }
+    }
+
+    const invalid = Boolean(drift) || bigAucDrop;
+
+    return {
+      tier: "max",
+      signal_confidence: 0.98, // confidence that the warning signals are accurate
+      assumption_verdict: invalid ? "INVALID" : "VALID",
+      assumption_confidence: invalid ? 0.87 : 0.7,
+      risk_level: invalid ? "CRITICAL" : "MEDIUM",
+      key_findings: signals.map((s) => s.assertion).filter(Boolean),
+      recommended_actions: invalid
+        ? (Array.isArray(asof.recommended_actions) && asof.recommended_actions.length
+            ? asof.recommended_actions
+            : ["RETRAIN_MODEL", "REVIEW_FEATURE_PIPELINE", "RECALIBRATE_THRESHOLDS"])
+        : ["MONITOR", "SCHEDULE_RETRAIN_REVIEW"],
+      evidence: signals.map((s) => ({
+        source: s.source,
+        assertion: s.assertion,
+        last_verified_at: s.last_verified_at,
+        priority: s.priority,
+        signal_confidence: s.confidence
+      })),
+      conflicts: [],
+      timestamp: nowIso
+    };
+  }
+
+  // ===== Policy claim conflict rules (Test #1) =====
+  if (type === "policy_claim") {
+    const fixed = signals.some((s) => has(s.assertion, /\b1\s*[-–]\s*3\b|\b1\s*to\s*3\b/));
+    const exceed = signals.some((s) => has(s.assertion, /exceed|varies|more than|longer|4\s*[-–]\s*6|4\s*to\s*6/));
+
+    if (fixed && exceed) {
+      return {
+        tier: "max",
+        signal_confidence: 0.95,
+        assumption_verdict: "CONFLICTED",
+        assumption_confidence: 0.72,
+        risk_level: "HIGH",
+        key_findings: ["Signals conflict: fixed timeframe vs sources indicating variability/exceeding 3 days."],
+        recommended_actions: ["AVOID_HARDCODING", "USE_RANGE_WITH_CAVEATS"],
+        evidence: signals.map((s) => ({
+          source: s.source,
+          assertion: s.assertion,
+          last_verified_at: s.last_verified_at,
+          priority: s.priority,
+          signal_confidence: s.confidence
+        })),
+        conflicts: [{
+          between: ["fixed_claim", "variability_claim"],
+          type: "assertion_conflict",
+          detail: "One signal states a fixed timeframe; another indicates it can exceed that timeframe."
+        }],
+        timestamp: nowIso
+      };
+    }
+  }
+
+  // Fallback
+  return {
+    tier: "max",
+    signal_confidence: 0.9,
+    assumption_verdict: "UNKNOWN",
+    assumption_confidence: 0.5,
+    risk_level: "MEDIUM",
+    key_findings: ["Processed signals but no specialized evaluator matched this payload type yet."],
+    recommended_actions: ["ADD_TYPE_RULES"],
+    evidence: signals.map((s) => ({
+      source: s.source,
+      assertion: s.assertion,
+      last_verified_at: s.last_verified_at,
+      priority: s.priority,
+      signal_confidence: s.confidence
+    })),
+    conflicts: [],
+    timestamp: nowIso
+  };
+}

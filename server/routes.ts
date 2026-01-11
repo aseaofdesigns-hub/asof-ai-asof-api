@@ -16,6 +16,7 @@ export async function registerRoutes(
     try {
       const stripe = await getUncachableStripeClient();
       const { tier } = api.payments.create.input.parse(req.body);
+
       
       // Live Stripe price IDs - fallback if database sync hasn't happened
       const livePriceIds: Record<string, { price_id: string; unit_amount: number }> = {
