@@ -7,6 +7,363 @@ import { getUncachableStripeClient } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 
+type Verdict = "VALID" | "INVALID" | "CONFLICTED" | "UNKNOWN" | "STALE";
+type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+interface Signal {
+  source?: string;
+  assertion?: string;
+  last_verified_at?: string;
+  priority?: number;
+  confidence?: number;
+  name?: string;
+  value?: any;
+  weight?: number;
+}
+
+interface BaseResult {
+  assumption_verdict: Verdict;
+  assumption_confidence: number;
+  timestamp: string;
+}
+
+interface LiteResult extends BaseResult {
+  tier: "lite";
+}
+
+interface EvidenceItem {
+  source: string;
+  assertion: string;
+  last_verified_at: string;
+  priority: number;
+  signal_confidence: number;
+}
+
+interface ProResult extends BaseResult {
+  tier: "pro";
+  explanation: string;
+  evidence: EvidenceItem[];
+}
+
+interface MaxResult extends BaseResult {
+  tier: "max";
+  explanation: string;
+  evidence: EvidenceItem[];
+  signal_confidence: number;
+  risk_level: RiskLevel;
+  key_findings: string[];
+  recommended_actions: string[];
+  conflicts: Array<{ signal_a: string; signal_b: string; description: string }>;
+  winning_signal: { source: string; score: number; reason: string } | null;
+}
+
+function calculateRecencyScore(lastVerifiedAt: string | undefined, freshnessWindowSeconds: number = 86400): number {
+  if (!lastVerifiedAt) return 0.5;
+  const verifiedTime = new Date(lastVerifiedAt).getTime();
+  const now = Date.now();
+  const ageSeconds = (now - verifiedTime) / 1000;
+  if (ageSeconds <= 0) return 1.0;
+  if (ageSeconds >= freshnessWindowSeconds) return 0.0;
+  return 1.0 - (ageSeconds / freshnessWindowSeconds);
+}
+
+function extractSignals(payload: any): Signal[] {
+  const signals: Signal[] = [];
+  if (payload?.asof_check?.signals) {
+    signals.push(...payload.asof_check.signals);
+  }
+  if (payload?.asof?.signals) {
+    signals.push(...payload.asof.signals);
+  }
+  if (payload?.signals) {
+    signals.push(...payload.signals);
+  }
+  return signals;
+}
+
+function detectDatasetInvalidity(signals: Signal[]): { invalid: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  for (const sig of signals) {
+    const assertion = (sig.assertion || sig.value?.toString() || "").toLowerCase();
+    if (assertion.includes("drift") && assertion.includes("exceeds threshold")) {
+      reasons.push("Data drift exceeds threshold");
+    }
+    const aucMatch = assertion.match(/(\d+\.?\d*)\s*→\s*(\d+\.?\d*)/);
+    if (aucMatch) {
+      const before = parseFloat(aucMatch[1]);
+      const after = parseFloat(aucMatch[2]);
+      if (before - after >= 0.10) {
+        reasons.push(`AUC drop detected: ${before} → ${after}`);
+      }
+    }
+  }
+  return { invalid: reasons.length > 0, reasons };
+}
+
+function detectPolicyConflict(signals: Signal[]): { conflicted: boolean; conflicts: Array<{ signal_a: string; signal_b: string; description: string }> } {
+  const conflicts: Array<{ signal_a: string; signal_b: string; description: string }> = [];
+  const fixedRangePatterns = [/\d+\s*[-–]\s*\d+\s*days?/i, /within\s+\d+\s*days?/i];
+  const variablePatterns = [/varies/i, /can exceed/i, /up to/i, /4\s*[-–]\s*6\s*days?/i, /may take longer/i];
+  
+  const fixedSignals: Signal[] = [];
+  const variableSignals: Signal[] = [];
+  
+  for (const sig of signals) {
+    const assertion = sig.assertion || sig.value?.toString() || "";
+    const isFixed = fixedRangePatterns.some(p => p.test(assertion));
+    const isVariable = variablePatterns.some(p => p.test(assertion));
+    if (isFixed) fixedSignals.push(sig);
+    if (isVariable) variableSignals.push(sig);
+  }
+  
+  for (const fixed of fixedSignals) {
+    for (const variable of variableSignals) {
+      conflicts.push({
+        signal_a: fixed.source || fixed.name || "signal_fixed",
+        signal_b: variable.source || variable.name || "signal_variable",
+        description: `Fixed range "${fixed.assertion || fixed.value}" conflicts with variable "${variable.assertion || variable.value}"`
+      });
+    }
+  }
+  
+  return { conflicted: conflicts.length > 0, conflicts };
+}
+
+function checkStaleness(payload: any, nowIso: string): boolean {
+  const freshness = payload?.asof_check?.freshness || payload?.asof?.freshness;
+  if (!freshness?.stale_after) return false;
+  const staleAfter = new Date(freshness.stale_after).getTime();
+  const now = new Date(nowIso).getTime();
+  return now > staleAfter;
+}
+
+function computeSignalScores(signals: Signal[], freshnessWindowSeconds: number = 86400) {
+  return signals.map((sig, idx) => {
+    const priority = sig.priority || Math.round((sig.weight || 0.5) * 100);
+    const recencyScore = calculateRecencyScore(sig.last_verified_at, freshnessWindowSeconds);
+    const signalConf = sig.confidence || sig.weight || 0.8;
+    const weight = 0.6 * (priority / 100) + 0.4 * recencyScore;
+    const score = weight * signalConf;
+    return {
+      source: sig.source || sig.name || `signal_${idx + 1}`,
+      priority,
+      recencyScore,
+      signalConf,
+      weight,
+      score
+    };
+  }).sort((a, b) => b.score - a.score);
+}
+
+function deriveConfidenceFromScores(scoredSignals: ReturnType<typeof computeSignalScores>, verdict: Verdict): number {
+  if (scoredSignals.length === 0) return 0.5;
+  
+  const topScore = scoredSignals[0].score;
+  const runnerUpScore = scoredSignals[1]?.score || 0;
+  const separation = topScore - runnerUpScore;
+  
+  let confidence = Math.min(0.95, topScore + (separation * 0.2));
+  
+  if (verdict === "CONFLICTED" || verdict === "STALE") {
+    confidence = Math.min(confidence, 0.6);
+  }
+  if (verdict === "UNKNOWN") {
+    confidence = Math.min(confidence, 0.5);
+  }
+  
+  return parseFloat(confidence.toFixed(3));
+}
+
+function evaluateLite(payload: any, nowIso: string): LiteResult {
+  const signals = extractSignals(payload);
+  const payloadType = payload?.type || payload?.asof_check?.type || "unknown";
+  const freshnessWindow = payload?.asof_check?.freshness?.max_age_seconds || payload?.asof?.freshness?.max_age_seconds || 86400;
+  
+  let verdict: Verdict = "UNKNOWN";
+  
+  if (checkStaleness(payload, nowIso)) {
+    verdict = "STALE";
+  } else if (payloadType === "dataset_validity") {
+    const { invalid } = detectDatasetInvalidity(signals);
+    if (invalid) {
+      verdict = "INVALID";
+    } else if (signals.length > 0) {
+      verdict = "VALID";
+    }
+  } else if (payloadType === "policy_claim") {
+    const { conflicted } = detectPolicyConflict(signals);
+    if (conflicted) {
+      verdict = "CONFLICTED";
+    } else if (signals.length > 0) {
+      verdict = "VALID";
+    }
+  } else if (signals.length > 0) {
+    verdict = "VALID";
+  }
+  
+  const scoredSignals = computeSignalScores(signals, freshnessWindow);
+  const confidence = deriveConfidenceFromScores(scoredSignals, verdict);
+  
+  return {
+    tier: "lite",
+    assumption_verdict: verdict,
+    assumption_confidence: confidence,
+    timestamp: nowIso
+  };
+}
+
+function evaluatePro(payload: any, nowIso: string): ProResult {
+  const liteResult = evaluateLite(payload, nowIso);
+  const signals = extractSignals(payload);
+  
+  const evidence: EvidenceItem[] = signals.map((sig, idx) => ({
+    source: sig.source || sig.name || `signal_${idx + 1}`,
+    assertion: sig.assertion || (typeof sig.value === 'string' ? sig.value : JSON.stringify(sig.value)) || "No assertion",
+    last_verified_at: sig.last_verified_at || nowIso,
+    priority: sig.priority || Math.round((sig.weight || 0.5) * 100),
+    signal_confidence: sig.confidence || sig.weight || 0.8
+  }));
+  
+  let explanation = "";
+  if (liteResult.assumption_verdict === "STALE") {
+    explanation = "The data has exceeded its freshness window and should be re-verified before relying on it.";
+  } else if (liteResult.assumption_verdict === "INVALID") {
+    const { reasons } = detectDatasetInvalidity(signals);
+    explanation = `Assumption invalidated: ${reasons.join("; ")}. Signals indicate the underlying data or model has degraded.`;
+  } else if (liteResult.assumption_verdict === "CONFLICTED") {
+    explanation = "Multiple signals provide contradictory information. Manual review recommended before proceeding.";
+  } else if (liteResult.assumption_verdict === "VALID") {
+    explanation = `Signals verified against ${evidence.length} source(s). All indicators consistent with the stated assumption.`;
+  } else {
+    explanation = "Insufficient signal data to make a definitive determination.";
+  }
+  
+  return {
+    tier: "pro",
+    assumption_verdict: liteResult.assumption_verdict,
+    assumption_confidence: liteResult.assumption_confidence,
+    timestamp: liteResult.timestamp,
+    explanation,
+    evidence
+  };
+}
+
+function evaluateMax(payload: any, nowIso: string): MaxResult {
+  const proResult = evaluatePro(payload, nowIso);
+  const signals = extractSignals(payload);
+  const payloadType = payload?.type || payload?.asof_check?.type || "unknown";
+  const freshnessWindow = payload?.asof_check?.freshness?.max_age_seconds || payload?.asof?.freshness?.max_age_seconds || 86400;
+  
+  const scoredSignals = signals.map((sig, idx) => {
+    const priority = sig.priority || Math.round((sig.weight || 0.5) * 100);
+    const recencyScore = calculateRecencyScore(sig.last_verified_at, freshnessWindow);
+    const signalConf = sig.confidence || sig.weight || 0.8;
+    const weight = 0.6 * (priority / 100) + 0.4 * recencyScore;
+    const score = weight * signalConf;
+    return {
+      source: sig.source || sig.name || `signal_${idx + 1}`,
+      priority,
+      recencyScore,
+      signalConf,
+      weight,
+      score
+    };
+  });
+  
+  scoredSignals.sort((a, b) => b.score - a.score);
+  
+  const avgSignalConfidence = scoredSignals.length > 0
+    ? scoredSignals.reduce((sum, s) => sum + s.signalConf, 0) / scoredSignals.length
+    : 0.5;
+  
+  let winningSignal: { source: string; score: number; reason: string } | null = null;
+  if (scoredSignals.length > 0) {
+    const top = scoredSignals[0];
+    const runnerUp = scoredSignals[1];
+    const separation = runnerUp ? (top.score - runnerUp.score).toFixed(3) : "N/A";
+    winningSignal = {
+      source: top.source,
+      score: parseFloat(top.score.toFixed(3)),
+      reason: `Highest weighted score (priority=${top.priority}, recency=${top.recencyScore.toFixed(2)}, confidence=${top.signalConf}). Separation from runner-up: ${separation}`
+    };
+  }
+  
+  let riskLevel: RiskLevel = "LOW";
+  const keyFindings: string[] = [];
+  let recommendedActions: string[] = [];
+  const conflicts: Array<{ signal_a: string; signal_b: string; description: string }> = [];
+  
+  if (proResult.assumption_verdict === "STALE") {
+    riskLevel = "HIGH";
+    keyFindings.push("Data has exceeded freshness threshold");
+    recommendedActions = ["REFRESH_DATA_SOURCES", "RE_VALIDATE_ASSUMPTIONS"];
+  } else if (payloadType === "dataset_validity") {
+    const { invalid, reasons } = detectDatasetInvalidity(signals);
+    if (invalid) {
+      riskLevel = "CRITICAL";
+      keyFindings.push(...reasons);
+      recommendedActions = payload?.asof_check?.recommended_actions || 
+        ["RETRAIN_MODEL", "REVIEW_FEATURE_PIPELINE", "RECALIBRATE_THRESHOLDS"];
+    } else {
+      keyFindings.push("All dataset validity signals within acceptable bounds");
+      recommendedActions = ["CONTINUE_MONITORING", "SCHEDULE_NEXT_VALIDATION"];
+    }
+  } else if (payloadType === "policy_claim") {
+    const conflictResult = detectPolicyConflict(signals);
+    if (conflictResult.conflicted) {
+      riskLevel = "HIGH";
+      conflicts.push(...conflictResult.conflicts);
+      keyFindings.push(`${conflictResult.conflicts.length} signal conflict(s) detected`);
+      recommendedActions = ["AVOID_HARDCODING", "USE_RANGE_WITH_CAVEATS", "CONSULT_AUTHORITATIVE_SOURCE"];
+    } else {
+      keyFindings.push("Policy signals are consistent");
+      recommendedActions = ["PROCEED_WITH_STATED_POLICY"];
+    }
+  } else {
+    if (signals.length === 0) {
+      keyFindings.push("No signals provided for evaluation");
+      riskLevel = "MEDIUM";
+    } else {
+      keyFindings.push(`Evaluated ${signals.length} signal(s)`);
+    }
+    recommendedActions = ["REVIEW_SIGNAL_SOURCES", "VALIDATE_ASSUMPTIONS"];
+  }
+  
+  if (proResult.assumption_verdict === "CONFLICTED" && riskLevel !== "CRITICAL") {
+    riskLevel = "HIGH";
+  }
+  
+  let assumptionConfidence = 0.5;
+  if (scoredSignals.length > 0) {
+    const topScore = scoredSignals[0].score;
+    const runnerUpScore = scoredSignals[1]?.score || 0;
+    const separation = topScore - runnerUpScore;
+    assumptionConfidence = Math.min(0.95, topScore + (separation * 0.2));
+  }
+  
+  if (proResult.assumption_verdict === "CONFLICTED" || proResult.assumption_verdict === "STALE") {
+    assumptionConfidence = Math.min(assumptionConfidence, 0.6);
+  }
+  if (proResult.assumption_verdict === "UNKNOWN") {
+    assumptionConfidence = Math.min(assumptionConfidence, 0.5);
+  }
+  
+  return {
+    tier: "max",
+    assumption_verdict: proResult.assumption_verdict,
+    assumption_confidence: parseFloat(assumptionConfidence.toFixed(3)),
+    timestamp: nowIso,
+    explanation: proResult.explanation,
+    evidence: proResult.evidence,
+    signal_confidence: parseFloat(avgSignalConfidence.toFixed(3)),
+    risk_level: riskLevel,
+    key_findings: keyFindings,
+    recommended_actions: recommendedActions,
+    conflicts,
+    winning_signal: winningSignal
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -125,24 +482,23 @@ export async function registerRoutes(
       if (!payment || payment.status !== 'paid') {
         return res.status(401).json({ message: "Payment required to run automation" });
       }
-      const tier = payment.tier;
+      const tier = payment.tier as "lite" | "pro" | "max";
+      const nowIso = new Date().toISOString();
 
-      const result = {
-        insight: `As-of signal processed (${tier.toUpperCase()} Tier)`,
-        confidence: tier === 'max' ? 0.98 : tier === 'pro' ? 0.92 : 0.87,
-        evidence: tier !== 'lite' ? [
-          { name: "source_timestamp", value: new Date().toISOString(), weight: 0.7 },
-          { name: "consistency_check", value: true, weight: 0.3 }
-        ] : undefined,
-        explanation: tier !== 'lite' ? "Signal verified against primary and secondary sources with high consistency." : undefined,
-        timestamp: new Date().toISOString()
-      };
+      let result: LiteResult | ProResult | MaxResult;
+      if (tier === "max") {
+        result = evaluateMax(payload, nowIso);
+      } else if (tier === "pro") {
+        result = evaluatePro(payload, nowIso);
+      } else {
+        result = evaluateLite(payload, nowIso);
+      }
 
       await storage.createSignal({
         agentId: agent_id,
         payload: payload,
-        insight: result.insight,
-        confidence: result.confidence
+        insight: `${result.assumption_verdict} (${tier.toUpperCase()})`,
+        confidence: result.assumption_confidence
       });
 
       res.json({

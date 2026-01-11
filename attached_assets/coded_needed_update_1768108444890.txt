@@ -1,0 +1,79 @@
+I need you to upgrade my /api/run tier logic.
+
+Context:
+- This endpoint currently returns a template response with confidence and evidence.
+- MCP server forwards validate_asof -> POST https://asofai.com/api/run with { agent_id, payload, sessionId }.
+- Payment is already verified in /api/run using storage.getPaymentBySessionId(sessionId). It provides payment.tier ("lite" | "pro" | "max").
+
+Goal:
+Implement real tiered outputs:
+1) LITE ($0.50): return minimal fields only
+   - tier
+   - assumption_verdict (VALID|INVALID|CONFLICTED|UNKNOWN|STALE)
+   - assumption_confidence (0..1)
+   - timestamp
+
+2) PRO ($1.00): include explanation + evidence list
+   - everything in Lite
+   - explanation (string)
+   - evidence (array of objects). Should include each signal {source, assertion, last_verified_at, priority, signal_confidence}
+
+3) MAX ($2.50): include full decision intelligence
+   - everything in Pro
+   - signal_confidence (0..1) separate from assumption_confidence
+   - risk_level (LOW|MEDIUM|HIGH|CRITICAL)
+   - key_findings (string[])
+   - recommended_actions (string[])
+   - conflicts (array) when signals contradict
+   - winning_signal (which signal had highest weighted score and why)
+
+Important behavior:
+- "signal_confidence" is how confident we are that the signals are accurate/verified.
+- "assumption_verdict" is whether the user’s assumption is true given the signals. These can differ (e.g., high signal_confidence but assumption_verdict = INVALID).
+- The response must be deterministic based ONLY on the payload signals (no web calls).
+
+Implementation requirements:
+- Create helper evaluators:
+  - evaluateLite(payload, nowIso)
+  - evaluatePro(payload, nowIso)
+  - evaluateMax(payload, nowIso)
+- In /api/run:
+  - parse body with api.automation.run.input.parse(req.body)
+  - verify payment + tier (already exists)
+  - choose evaluator based on tier:
+      if tier === "max" -> evaluateMax
+      if tier === "pro" -> evaluatePro
+      else -> evaluateLite
+  - return res.json({ success: true, data: result })
+
+Evaluation logic (minimum viable but real):
+- For payload.type === "dataset_validity":
+  INVALID if:
+    - any signal assertion contains "drift" and "exceeds threshold"
+    - OR AUC drop >= 0.10 detected from text like "0.81 → 0.69"
+  risk_level:
+    - CRITICAL if INVALID and (drift or big AUC drop)
+    - HIGH if only one strong negative indicator
+    - MEDIUM otherwise
+  recommended_actions: use payload.asof_check.recommended_actions if present; else default to ["RETRAIN_MODEL","REVIEW_FEATURE_PIPELINE","RECALIBRATE_THRESHOLDS"] when INVALID
+
+- For payload.type === "policy_claim":
+  CONFLICTED if one signal indicates fixed range like "1–3 days" and another indicates "varies/can exceed/4–6 days".
+  risk_level HIGH for conflicted.
+  recommended_actions ["AVOID_HARDCODING","USE_RANGE_WITH_CAVEATS"].
+
+Weighting for MAX:
+- For each signal:
+  weight = 0.6*(priority/100) + 0.4*recencyScore(last_verified_at, freshness_window_seconds)
+  score = weight * signal.confidence
+- winning_signal = highest score
+- assumption_confidence derived from top score and separation vs runner-up, capped lower when CONFLICTED/STALE.
+
+Also:
+- Ensure output schema is JSON (not narrative), and MCP clients can parse it.
+- Remove any old template evidence fields like {name:"source_timestamp"} and {name:"consistency_check"} for MAX and PRO. Use real evidence from signals instead.
+
+Deliverables:
+- Updated /api/run handler code
+- The three evaluator functions
+- No breaking changes to payment verification and request parsing
