@@ -282,6 +282,56 @@ console.log(data.data.confidence); // 0.98 for MAX tier`;
 
           <Card className="glass-card border-white/5">
             <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Code2 className="w-5 h-5 text-primary" />
+                Supported Languages & Frameworks
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                ASOF.ai is a REST API that accepts JSON. It works with any language or framework that can make HTTP requests.
+              </p>
+              
+              <div>
+                <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">Programming Languages</h4>
+                <div className="flex flex-wrap gap-2">
+                  {["Python", "JavaScript", "TypeScript", "Go", "Rust", "Java", "C#", "Ruby", "PHP", "Swift", "Kotlin", "Scala", "Elixir", "C++"].map((lang) => (
+                    <Badge key={lang} variant="outline" className="bg-white/5" data-testid={`badge-lang-${lang.toLowerCase()}`}>{lang}</Badge>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">AI Agent Frameworks</h4>
+                <div className="flex flex-wrap gap-2">
+                  {["LangChain", "LlamaIndex", "AutoGPT", "CrewAI", "AutoGen", "Semantic Kernel", "Haystack", "Flowise"].map((fw) => (
+                    <Badge key={fw} variant="outline" className="bg-primary/10 text-primary border-primary/20" data-testid={`badge-framework-${fw.toLowerCase().replace(/\s/g, '-')}`}>{fw}</Badge>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">LLM Providers (Tool/Function Calling)</h4>
+                <div className="flex flex-wrap gap-2">
+                  {["OpenAI", "Anthropic Claude", "Google Gemini", "Mistral", "Cohere", "AWS Bedrock", "Azure OpenAI", "Groq", "Together AI"].map((provider) => (
+                    <Badge key={provider} variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20" data-testid={`badge-provider-${provider.toLowerCase().replace(/\s/g, '-')}`}>{provider}</Badge>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">Integration Protocols</h4>
+                <div className="flex flex-wrap gap-2">
+                  {["REST API", "MCP (Model Context Protocol)", "OpenAPI 3.1", "Webhooks", "cURL", "HTTP/HTTPS"].map((protocol) => (
+                    <Badge key={protocol} variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20" data-testid={`badge-protocol-${protocol.toLowerCase().replace(/[\s\/()]/g, '-')}`}>{protocol}</Badge>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card border-white/5">
+            <CardHeader>
               <CardTitle className="flex items-center justify-between text-lg">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">POST</Badge>
