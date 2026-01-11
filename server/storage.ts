@@ -8,6 +8,7 @@ export interface IStorage {
   createPayment(payment: { stripeSessionId: string, amount: number, tier: string }): Promise<Payment>;
   getPaymentBySessionId(sessionId: string): Promise<Payment | undefined>;
   updatePaymentStatus(sessionId: string, status: string): Promise<Payment>;
+  markSessionConsumed(sessionId: string): Promise<Payment>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -38,6 +39,14 @@ export class DatabaseStorage implements IStorage {
   async updatePaymentStatus(sessionId: string, status: string): Promise<Payment> {
     const [payment] = await db.update(payments)
       .set({ status })
+      .where(eq(payments.stripeSessionId, sessionId))
+      .returning();
+    return payment;
+  }
+
+  async markSessionConsumed(sessionId: string): Promise<Payment> {
+    const [payment] = await db.update(payments)
+      .set({ consumed: true })
       .where(eq(payments.stripeSessionId, sessionId))
       .returning();
     return payment;

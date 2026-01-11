@@ -406,6 +406,9 @@ export async function registerRoutes(
       if (!payment || payment.status !== 'paid') {
         return res.status(401).json({ message: "Payment required to run automation" });
       }
+      if (payment.consumed) {
+        return res.status(401).json({ message: "This session has already been used. Please purchase a new validation." });
+      }
       const tier = payment.tier as "lite" | "pro" | "max";
       const nowIso = safeIsoNow();
 
@@ -424,6 +427,8 @@ export async function registerRoutes(
         insight: `${result.assumption_verdict} (${tier.toUpperCase()})`,
         confidence: result.assumption_confidence
       });
+
+      await storage.markSessionConsumed(sessionId);
 
       return res.json({ success: true, data: result });
     } catch (err) {

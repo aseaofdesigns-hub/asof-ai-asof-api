@@ -1,4 +1,4 @@
-import { pgTable, text, serial, jsonb, real, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, jsonb, real, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -17,6 +17,7 @@ export const payments = pgTable("payments", {
   status: text("status").notNull().default("pending"), // pending, paid
   amount: integer("amount").notNull(),
   tier: text("tier").notNull().default("lite"), // lite, pro, max
+  consumed: boolean("consumed").notNull().default(false), // one-time use protection
   createdAt: timestamp("created_at").defaultNow(),
 });
 
