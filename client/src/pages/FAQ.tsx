@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, Lightbulb, HelpCircle, Check, X } from "lucide-react";
+import { CreditCard, Lightbulb, HelpCircle, Check, X, Copy, CheckCircle } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -10,6 +11,14 @@ import {
 } from "@/components/ui/accordion";
 
 export default function FAQ() {
+  const [copied, setCopied] = useState(false);
+  
+  const copyEmail = () => {
+    navigator.clipboard.writeText("Support@asofai.com");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const container = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -150,18 +159,27 @@ export default function FAQ() {
           </motion.div>
 
           <motion.div variants={item} className="text-center py-8">
-            <p className="text-sm text-muted-foreground">
-              Still have questions?{" "}
-              <a 
-                href="mailto:Support@asofai.com" 
-                className="text-primary hover:underline cursor-pointer"
-                data-testid="link-faq-email"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Contact Support
-              </a>
+            <p className="text-sm text-muted-foreground mb-2">
+              Still have questions? Contact us at:
             </p>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-primary font-medium">Support@asofai.com</span>
+              <button
+                onClick={copyEmail}
+                className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
+                data-testid="button-copy-email-faq"
+                title="Copy email address"
+              >
+                {copied ? (
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <Copy className="w-4 h-4 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+            {copied && (
+              <p className="text-xs text-emerald-400 mt-1">Email copied!</p>
+            )}
           </motion.div>
         </motion.div>
       </main>

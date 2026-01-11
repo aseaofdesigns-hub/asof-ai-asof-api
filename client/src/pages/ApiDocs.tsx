@@ -22,10 +22,17 @@ import { apiRequest } from "@/lib/queryClient";
 
 export default function ApiDocs() {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [emailCopied, setEmailCopied] = useState(false);
   const [sessionId, setSessionId] = useState("");
   const [testScenario, setTestScenario] = useState<"conflicted" | "invalid">("conflicted");
   const [testResult, setTestResult] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+
+  const copyEmail = () => {
+    navigator.clipboard.writeText("Support@asofai.com");
+    setEmailCopied(true);
+    setTimeout(() => setEmailCopied(false), 2000);
+  };
 
   const runTest = async () => {
     if (!sessionId.trim()) {
@@ -656,17 +663,28 @@ console.log(data.data.confidence); // 0.98 for MAX tier`;
             </CardContent>
           </Card>
 
-          <div className="text-center py-8 text-sm text-muted-foreground">
-            Questions? Contact us at{" "}
-            <a 
-              href="mailto:Support@asofai.com" 
-              className="text-primary hover:underline cursor-pointer"
-              data-testid="link-email-docs"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Support@asofai.com
-            </a>
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground mb-2">
+              Questions? Contact us at:
+            </p>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-primary font-medium">Support@asofai.com</span>
+              <button
+                onClick={copyEmail}
+                className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
+                data-testid="button-copy-email-docs"
+                title="Copy email address"
+              >
+                {emailCopied ? (
+                  <Check className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <Copy className="w-4 h-4 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+            {emailCopied && (
+              <p className="text-xs text-emerald-400 mt-1">Email copied!</p>
+            )}
           </div>
         </div>
       </div>
