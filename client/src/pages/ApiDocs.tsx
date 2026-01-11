@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft, 
   Copy, 
@@ -12,12 +13,87 @@ import {
   Shield, 
   DollarSign,
   ExternalLink,
-  Terminal
+  Terminal,
+  Play,
+  Loader2
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function ApiDocs() {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState("");
+  const [testScenario, setTestScenario] = useState<"conflicted" | "invalid">("conflicted");
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+
+  const runTest = async () => {
+    if (!sessionId.trim()) {
+      setTestResult(JSON.stringify({ error: "Please enter a session ID" }, null, 2));
+      return;
+    }
+    setIsRunning(true);
+    setTestResult(null);
+
+    const conflictedPayload = {
+      agent_id: "test-agent",
+      sessionId: sessionId.trim(),
+      payload: {
+        type: "policy_claim",
+        claim: "Amazon delivers in 1-3 days",
+        asof_check: {
+          signals: [
+            {
+              source: "amazon_policy",
+              priority: 1,
+              assertion: "Standard shipping 1-3 business days",
+              confidence: 0.95,
+              last_verified_at: new Date().toISOString()
+            },
+            {
+              source: "customer_reviews",
+              priority: 2,
+              assertion: "Delivery varies and exceeds 4-6 days during peak",
+              confidence: 0.85,
+              last_verified_at: new Date().toISOString()
+            }
+          ]
+        }
+      }
+    };
+
+    const invalidPayload = {
+      agent_id: "ml-monitor",
+      sessionId: sessionId.trim(),
+      payload: {
+        type: "dataset_validity",
+        dataset_name: "fraud_model",
+        asof_check: {
+          signals: [
+            {
+              source: "model_monitor",
+              priority: 1,
+              assertion: "AUC dropped from 0.92 to 0.78 (drop of 0.14)",
+              confidence: 0.99,
+              last_verified_at: new Date().toISOString()
+            }
+          ]
+        }
+      }
+    };
+
+    try {
+      const payload = testScenario === "conflicted" ? conflictedPayload : invalidPayload;
+      const response = await apiRequest("POST", "/api/run", payload);
+      const data = await response.json();
+      setTestResult(JSON.stringify(data, null, 2));
+    } catch (err: unknown) {
+      const error = err as Error;
+      setTestResult(JSON.stringify({ error: error.message }, null, 2));
+    } finally {
+      setIsRunning(false);
+    }
+  };
 
   const copyToClipboard = (text: string, section: string) => {
     navigator.clipboard.writeText(text);
@@ -427,6 +503,83 @@ console.log(data.data.confidence); // 0.98 for MAX tier`;
                   </tr>
                 </tbody>
               </table>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card border-white/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Play className="w-5 h-5 text-primary" />
+                Test API
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Test the API directly. First create a payment, then enter your session ID below.
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Session ID (from Stripe)</label>
+                  <Input
+                    placeholder="cs_live_xxx or cs_test_xxx"
+                    value={sessionId}
+                    onChange={(e) => setSessionId(e.target.value)}
+                    className="bg-black/40 border-white/10"
+                    data-testid="input-session-id"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Test Scenario</label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={testScenario === "conflicted" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTestScenario("conflicted")}
+                      data-testid="button-scenario-conflicted"
+                    >
+                      CONFLICTED (Policy Claim)
+                    </Button>
+                    <Button
+                      variant={testScenario === "invalid" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setTestScenario("invalid")}
+                      data-testid="button-scenario-invalid"
+                    >
+                      INVALID (Dataset)
+                    </Button>
+                  </div>
+                </div>
+                
+                <Button 
+                  onClick={runTest} 
+                  disabled={isRunning}
+                  className="w-full gap-2"
+                  data-testid="button-run-test"
+                >
+                  {isRunning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      Run Test
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {testResult && (
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-muted-foreground mb-2">Result</h4>
+                  <pre className="bg-black/40 rounded-lg p-4 text-xs overflow-x-auto font-mono text-emerald-400 max-h-96 overflow-y-auto" data-testid="text-test-result">
+                    {testResult}
+                  </pre>
+                </div>
+              )}
             </CardContent>
           </Card>
 
