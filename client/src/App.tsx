@@ -9,6 +9,7 @@ import About from "@/pages/About";
 import Privacy from "@/pages/Privacy";
 import Contact from "@/pages/Contact";
 import ApiDocs from "@/pages/ApiDocs";
+import FAQ from "@/pages/FAQ";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/contact" component={Contact} />
       <Route path="/docs" component={ApiDocs} />
+      <Route path="/faq" component={FAQ} />
       <Route component={NotFound} />
     </Switch>
   );

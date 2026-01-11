@@ -27,6 +27,9 @@ export function Header() {
           <Link href="/contact" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
             Contact
           </Link>
+          <Link href="/faq" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors" data-testid="link-faq">
+            FAQ
+          </Link>
           <Link href="/docs" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1" data-testid="link-api-docs">
             <Code2 className="w-3 h-3" />
             API
