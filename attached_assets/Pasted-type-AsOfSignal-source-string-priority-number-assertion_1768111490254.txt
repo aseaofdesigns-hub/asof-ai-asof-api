@@ -1,0 +1,267 @@
+type AsOfSignal = {
+  source?: string;
+  priority?: number;
+  assertion?: string;
+  confidence?: number;
+  last_verified_at?: string;
+};
+
+type AsOfPayload = {
+  type?: string;
+  assumption?: string;
+  claim?: string;
+  dataset_name?: string;
+  last_trained?: string;
+  asof_check?: {
+    freshness_window_seconds?: number;
+    signals?: AsOfSignal[];
+    recommended_actions?: string[];
+    conflict_rules?: {
+      mode?: string;
+      resolution_strategy?: string;
+    };
+  };
+};
+
+function safeIsoNow() {
+  return new Date().toISOString();
+}
+
+function parseIsoMs(iso?: string): number | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
+function recencyScore(lastVerifiedIso?: string, freshnessWindowSec: number = 604800): number {
+  const ms = parseIsoMs(lastVerifiedIso);
+  if (!ms) return 0.2; // unknown date -> low-ish recency
+  const ageSec = Math.max(0, (Date.now() - ms) / 1000);
+  // 1.0 if brand new, ~0.0 if older than freshness window (soft floor at 0.05)
+  const r = 1 - ageSec / Math.max(1, freshnessWindowSec);
+  return clamp01(Math.max(0.05, r));
+}
+
+function txt(s?: string) {
+  return String(s ?? "").toLowerCase();
+}
+
+function has(assertion: string | undefined, re: RegExp) {
+  return re.test(txt(assertion));
+}
+
+function extractAucDrop(assertion?: string): number | null {
+  // Supports: "AUC dropped from 0.84 to 0.66" or "0.84 -> 0.66"
+  if (!assertion) return null;
+  const nums = assertion.match(/0\.\d+/g);
+  if (!nums || nums.length < 2) return null;
+  const a = Number(nums[0]);
+  const b = Number(nums[1]);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return a - b;
+}
+
+function normalizeEvidence(signals: AsOfSignal[]) {
+  return signals.map((s) => ({
+    source: s.source ?? "unknown",
+    assertion: s.assertion ?? "",
+    last_verified_at: s.last_verified_at ?? null,
+    priority: typeof s.priority === "number" ? s.priority : 0,
+    signal_confidence: typeof s.confidence === "number" ? s.confidence : 0.5
+  }));
+}
+
+function evaluateLite(payload: AsOfPayload, nowIso: string) {
+  const type = payload?.type ?? "unknown";
+  const asof = payload?.asof_check ?? {};
+  const signals = Array.isArray(asof.signals) ? asof.signals : [];
+
+  // Default: unknown
+  let assumption_verdict: "VALID" | "INVALID" | "CONFLICTED" | "UNKNOWN" | "STALE" = "UNKNOWN";
+  let assumption_confidence = 0.5;
+
+  // Minimal deterministic rules
+  if (type === "dataset_validity") {
+    const drift = signals.some((s) => has(s.assertion, /drift/) && has(s.assertion, /exceed|threshold/));
+    const aucDrop = signals.map((s) => extractAucDrop(s.assertion)).find((d) => typeof d === "number") ?? null;
+    const bigAucDrop = typeof aucDrop === "number" && aucDrop >= 0.10;
+
+    if (drift || bigAucDrop) {
+      assumption_verdict = "INVALID";
+      assumption_confidence = 0.78;
+    } else if (signals.length) {
+      assumption_verdict = "VALID";
+      assumption_confidence = 0.62;
+    }
+  }
+
+  if (type === "policy_claim") {
+    const fixed = signals.some((s) => has(s.assertion, /\b1\s*[-–]?\s*3\b|\b1\s*to\s*3\b/));
+    const exceed = signals.some((s) => has(s.assertion, /vary|exceed|more than|longer|4\s*[-–]?\s*6|4\s*to\s*6/));
+    if (fixed && exceed) {
+      assumption_verdict = "CONFLICTED";
+      assumption_confidence = 0.7;
+    } else if (fixed) {
+      assumption_verdict = "VALID";
+      assumption_confidence = 0.6;
+    }
+  }
+
+  return {
+    tier: "lite",
+    assumption_verdict,
+    assumption_confidence,
+    timestamp: nowIso
+  };
+}
+
+function evaluatePro(payload: AsOfPayload, nowIso: string) {
+  const asof = payload?.asof_check ?? {};
+  const signals = Array.isArray(asof.signals) ? asof.signals : [];
+  const lite = evaluateLite(payload, nowIso);
+
+  const explanation =
+    lite.assumption_verdict === "INVALID"
+      ? "Assumption invalidated based on provided signals."
+      : lite.assumption_verdict === "CONFLICTED"
+      ? "Signals conflict; assumption cannot be treated as reliably true without caveats."
+      : lite.assumption_verdict === "VALID"
+      ? "Signals support the assumption within the current context."
+      : "Insufficient or inconclusive signals to validate the assumption.";
+
+  return {
+    tier: "pro",
+    ...lite,
+    explanation,
+    evidence: normalizeEvidence(signals)
+  };
+}
+
+function evaluateMax(payload: AsOfPayload, nowIso: string) {
+  const type = payload?.type ?? "unknown";
+  const asof = payload?.asof_check ?? {};
+  const signals = Array.isArray(asof.signals) ? asof.signals : [];
+  const freshnessWindowSec = typeof asof.freshness_window_seconds === "number" ? asof.freshness_window_seconds : 604800;
+
+  const evidence = normalizeEvidence(signals);
+
+  // Compute weighted scores per signal
+  const scored = evidence.map((s) => {
+    const priority = typeof s.priority === "number" ? s.priority : 0;
+    const conf = typeof s.signal_confidence === "number" ? s.signal_confidence : 0.5;
+    const rec = recencyScore(s.last_verified_at ?? undefined, freshnessWindowSec);
+    const weight = 0.6 * (priority / 100) + 0.4 * rec;
+    const score = weight * conf;
+    return { ...s, recency: rec, weight, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const winner = scored[0];
+  const runnerUp = scored[1];
+  const separation = runnerUp ? winner.score - runnerUp.score : winner.score;
+
+  // Default outputs
+  let assumption_verdict: "VALID" | "INVALID" | "CONFLICTED" | "UNKNOWN" | "STALE" = "UNKNOWN";
+  let risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" = "MEDIUM";
+  let key_findings: string[] = [];
+  let recommended_actions: string[] = Array.isArray(asof.recommended_actions) ? asof.recommended_actions : [];
+  const conflicts: Array<{ between: string[]; type: string; detail: string }> = [];
+
+  // signal_confidence: average of top 2 confidences (weighted)
+  const top2 = scored.slice(0, 2);
+  const signal_confidence =
+    top2.length
+      ? clamp01(
+          top2.reduce((acc, s) => acc + s.signal_confidence * (s.weight || 0.5), 0) /
+            top2.reduce((acc, s) => acc + (s.weight || 0.5), 0)
+        )
+      : 0.5;
+
+  // Type-specific rules
+  if (type === "dataset_validity") {
+    const driftHit = scored.find((s) => has(s.assertion, /drift/) && has(s.assertion, /exceed|threshold/));
+    const aucSignal = scored.find((s) => has(s.assertion, /auc/));
+    const aucDrop = aucSignal ? extractAucDrop(aucSignal.assertion) : null;
+    const bigAucDrop = typeof aucDrop === "number" && aucDrop >= 0.10;
+
+    if (driftHit || bigAucDrop) {
+      assumption_verdict = "INVALID";
+      risk_level = "CRITICAL";
+      key_findings = [
+        driftHit ? "Data drift exceeds threshold" : null,
+        bigAucDrop ? `AUC drop >= 0.10 detected (${aucDrop?.toFixed(2)})` : null
+      ].filter(Boolean) as string[];
+
+      if (!recommended_actions.length) {
+        recommended_actions = ["RETRAIN_MODEL", "REVIEW_FEATURE_PIPELINE", "RECALIBRATE_THRESHOLDS"];
+      }
+    } else if (signals.length) {
+      assumption_verdict = "VALID";
+      risk_level = "MEDIUM";
+      key_findings = ["No strong degradation indicators detected in provided signals."];
+      if (!recommended_actions.length) recommended_actions = ["MONITOR"];
+    }
+  }
+
+  if (type === "policy_claim") {
+    const fixed = scored.some((s) => has(s.assertion, /\b1\s*[-–]?\s*3\b|\b1\s*to\s*3\b/));
+    const exceed = scored.some((s) => has(s.assertion, /vary|exceed|more than|longer|4\s*[-–]?\s*6|4\s*to\s*6/));
+    if (fixed && exceed) {
+      assumption_verdict = "CONFLICTED";
+      risk_level = "HIGH";
+      key_findings = ["Signals conflict: fixed timeframe vs sources indicating variability/exceeding 3 days."];
+      conflicts.push({
+        between: ["fixed_timeframe", "variability_or_delay"],
+        type: "assertion_conflict",
+        detail: "One signal states a fixed delivery window; another indicates it can exceed that window."
+      });
+      if (!recommended_actions.length) recommended_actions = ["AVOID_HARDCODING", "USE_RANGE_WITH_CAVEATS"];
+    } else if (fixed) {
+      assumption_verdict = "VALID";
+      risk_level = "MEDIUM";
+      key_findings = ["Signals support a standard delivery window, but monitor for exceptions."];
+      if (!recommended_actions.length) recommended_actions = ["ADD_CAVEATS", "MONITOR"];
+    }
+  }
+
+  // Derive assumption_confidence from winner score + separation, penalize conflicts
+  let assumption_confidence = clamp01(0.55 + winner.score * 0.35 + separation * 0.3);
+  if (assumption_verdict === "CONFLICTED") assumption_confidence = clamp01(assumption_confidence * 0.8);
+  if (assumption_verdict === "UNKNOWN") assumption_confidence = 0.5;
+
+  const explanation =
+    assumption_verdict === "INVALID"
+      ? "Assumption invalidated by high-priority, recent signals indicating degradation."
+      : assumption_verdict === "CONFLICTED"
+      ? "Signals conflict; highest-priority sources do not fully agree on the claim."
+      : assumption_verdict === "VALID"
+      ? "Signals support the assumption with acceptable priority/recency/confidence."
+      : "Insufficient matching rules or signals to reach a confident verdict.";
+
+  return {
+    tier: "max",
+    assumption_verdict,
+    assumption_confidence: Number(assumption_confidence.toFixed(3)),
+    timestamp: nowIso,
+    explanation,
+    evidence,
+    signal_confidence: Number(signal_confidence.toFixed(3)),
+    risk_level,
+    key_findings,
+    recommended_actions,
+    conflicts,
+    winning_signal: winner
+      ? {
+          source: winner.source,
+          score: Number(winner.score.toFixed(3)),
+          reason: `Highest weighted score (priority=${winner.priority}, recency=${winner.recency.toFixed(
+            2
+          )}, confidence=${winner.signal_confidence}). Separation from runner-up: ${Number(separation.toFixed(3))}`
+        }
+      : null
+  };
+}
