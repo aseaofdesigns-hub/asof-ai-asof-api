@@ -662,10 +662,8 @@ console.log(data.data.confidence); // 0.98 for MAX tier`;
               href="mailto:Support@asofai.com" 
               className="text-primary hover:underline cursor-pointer"
               data-testid="link-email-docs"
-              onClick={(e) => {
-                e.preventDefault();
-                window.location.href = "mailto:Support@asofai.com";
-              }}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               Support@asofai.com
             </a>

@@ -156,10 +156,8 @@ export default function FAQ() {
                 href="mailto:Support@asofai.com" 
                 className="text-primary hover:underline cursor-pointer"
                 data-testid="link-faq-email"
-                onClick={(e) => {
-                  e.preventDefault();
-                  window.location.href = "mailto:Support@asofai.com";
-                }}
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 Contact Support
               </a>
