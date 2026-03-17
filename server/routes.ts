@@ -386,10 +386,15 @@ export async function registerRoutes(
     try {
       const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      
+      const payment = await storage.getPaymentBySessionId(sessionId);
+
       if (session.payment_status === 'paid') {
         await storage.updatePaymentStatus(sessionId, 'paid');
-        return res.json({ status: 'paid' });
+        return res.json({
+          status: 'paid',
+          tier: payment?.tier ?? null,
+          amount: payment?.amount ?? null,
+        });
       }
       res.json({ status: session.payment_status });
     } catch (err) {

@@ -13,7 +13,13 @@ export default function VerifyPayment() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
 
-  const { data, isLoading, error } = useQuery<{ status: string }>({
+  const tierLabels: Record<string, { label: string; price: string }> = {
+    lite: { label: "Lite", price: "$0.50" },
+    pro: { label: "Pro", price: "$1.00" },
+    max: { label: "Max", price: "$2.50" },
+  };
+
+  const { data, isLoading, error } = useQuery<{ status: string; tier: string | null; amount: number | null }>({
     queryKey: [buildUrl(api.payments.verify.path, { sessionId: sessionId || "" })],
     enabled: !!sessionId,
     retry: 3,
@@ -61,7 +67,13 @@ export default function VerifyPayment() {
               <>
                 <CheckCircle2 className="w-12 h-12 text-green-500" />
                 <h2 className="text-xl font-semibold">Payment Confirmed!</h2>
-                <p className="text-muted-foreground">Your $0.50 payment was successful.</p>
+                <p className="text-muted-foreground">
+                  {data?.tier && tierLabels[data.tier]
+                    ? `Your ${tierLabels[data.tier].price} ${tierLabels[data.tier].label} plan payment was successful.`
+                    : data?.amount
+                    ? `Your $${(data.amount / 100).toFixed(2)} payment was successful.`
+                    : "Your payment was successful."}
+                </p>
                 <Button className="w-full" onClick={() => setLocation("/")}>
                   Run Automation Now
                 </Button>
