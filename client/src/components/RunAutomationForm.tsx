@@ -68,7 +68,12 @@ export function RunAutomationForm() {
         throw new Error(error.message || "Failed to initiate payment");
       }
       const { url } = await res.json();
-      window.open(url, '_blank');
+      const inIframe = window.self !== window.top;
+      if (inIframe) {
+        window.open(url, '_blank');
+      } else {
+        window.location.href = url;
+      }
     } catch (error) {
       toast({
         title: "Error",
