@@ -512,7 +512,24 @@ function gateSeverityByTier(result: any, tier: "lite" | "pro" | "max"): any {
   };
 
   if (tier === "lite") {
-    return gatedResult;
+    return {
+      ...gatedResult,
+      gated: true,
+      gated_reason: "Full analysis requires a higher tier",
+      gated_message: "⚠️ You're seeing the verdict only. Upgrade to Pro ($1.00) for explanation and evidence, or Max ($2.50) for the complete remediation plan and CRITICAL severity access.",
+      upgrade_options: [
+        {
+          tier: "pro",
+          price: "$1.00",
+          unlocks: ["Full explanation", "Evidence breakdown", "Remediation steps", "HIGH severity access"]
+        },
+        {
+          tier: "max",
+          price: "$2.50",
+          unlocks: ["Complete remediation plan", "CRITICAL severity access", "Conflict detection", "Risk level", "Prevention tips", "Winning signal analysis"]
+        }
+      ]
+    };
   }
 
   if (tier === "pro") {

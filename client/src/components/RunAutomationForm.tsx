@@ -186,11 +186,17 @@ export function RunAutomationForm() {
               {data.data.gated && (
                 <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                      data.data.preview?.risk_level === "CRITICAL" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"
-                    }`}>
-                      {data.data.preview?.risk_level} Severity
-                    </span>
+                    {data.data.preview?.risk_level ? (
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                        data.data.preview.risk_level === "CRITICAL" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"
+                      }`}>
+                        {data.data.preview.risk_level} Severity
+                      </span>
+                    ) : (
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-orange-500/20 text-orange-400">
+                        Lite Tier
+                      </span>
+                    )}
                     <span className="text-[8px] text-orange-300/60 font-mono">ACCESS RESTRICTED</span>
                   </div>
                   <p className="text-[9px] text-orange-200/70 leading-snug">{data.data.gated_message}</p>
