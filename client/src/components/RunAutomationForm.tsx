@@ -46,6 +46,14 @@ export function RunAutomationForm() {
   useEffect(() => {
     const saved = localStorage.getItem("stripe_session_id");
     if (saved) setPaidSessionId(saved);
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "stripe_session_id" && e.newValue) {
+        setPaidSessionId(e.newValue);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const initiatePayment = async (tier: 'lite' | 'pro' | 'max') => {
@@ -60,7 +68,7 @@ export function RunAutomationForm() {
         throw new Error(error.message || "Failed to initiate payment");
       }
       const { url } = await res.json();
-      window.location.href = url;
+      window.open(url, '_blank');
     } catch (error) {
       toast({
         title: "Error",
