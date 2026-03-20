@@ -84,6 +84,19 @@ export const api = {
               estimated_fix_time: z.string(),
               prevention_tips: z.array(z.string()),
             }).optional(),
+            gated: z.boolean().optional(),
+            gated_reason: z.string().optional(),
+            gated_message: z.string().optional(),
+            upgrade_hint: z.string().optional(),
+            upgrade_options: z.array(z.object({
+              tier: z.string(),
+              price: z.string(),
+              unlocks: z.array(z.string()),
+            })).optional(),
+            preview: z.object({
+              risk_level: z.string().optional(),
+              hint: z.string().optional(),
+            }).optional(),
           })
         }),
         400: errorSchemas.validation,
