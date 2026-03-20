@@ -306,29 +306,53 @@ export function RunAutomationForm() {
                 <thead className="uppercase tracking-wider text-muted-foreground bg-white/5">
                   <tr>
                     <th className="px-2 py-1">Feature</th>
-                    <th className="px-1 py-1 text-center">L</th>
-                    <th className="px-1 py-1 text-center">P</th>
-                    <th className="px-1 py-1 text-center">M</th>
+                    <th className="px-1 py-1 text-center text-emerald-400">L</th>
+                    <th className="px-1 py-1 text-center text-blue-400">P</th>
+                    <th className="px-1 py-1 text-center text-purple-400">M</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Verdict/Score</td>
+                    <td className="px-2 py-1 text-muted-foreground">Verdict + Confidence</td>
                     <td className="px-1 py-1 text-center">✅</td>
                     <td className="px-1 py-1 text-center">✅</td>
                     <td className="px-1 py-1 text-center">✅</td>
                   </tr>
                   <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Evidence/Risk</td>
+                    <td className="px-2 py-1 text-muted-foreground">Explanation</td>
                     <td className="px-1 py-1 text-center">❌</td>
                     <td className="px-1 py-1 text-center">✅</td>
                     <td className="px-1 py-1 text-center">✅</td>
                   </tr>
                   <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Conflict/Pri</td>
-                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-2 py-1 text-muted-foreground">Evidence</td>
                     <td className="px-1 py-1 text-center">❌</td>
                     <td className="px-1 py-1 text-center">✅</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1 text-muted-foreground">Remediation</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                    <td className="px-1 py-1 text-center">✅</td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1 text-muted-foreground">CRITICAL Access</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center text-purple-400 font-bold">✅</td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1 text-muted-foreground">Full Remediation Plan</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center text-purple-400 font-bold">✅</td>
+                  </tr>
+                  <tr>
+                    <td className="px-2 py-1 text-muted-foreground">Conflict Detection</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center">❌</td>
+                    <td className="px-1 py-1 text-center text-purple-400 font-bold">✅</td>
                   </tr>
                 </tbody>
               </table>
