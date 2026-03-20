@@ -434,6 +434,103 @@ function evaluateMax(payload: AsOfPayload, nowIso: string) {
   };
 }
 
+function gateSeverityByTier(result: any, tier: "lite" | "pro" | "max"): any {
+  if (tier === "max") return result;
+
+  const verdict = result.assumption_verdict;
+  const riskLevel = result.risk_level;
+
+  const tierLimits = {
+    lite: {
+      allowedRiskLevels: ["LOW", "MEDIUM"],
+      showRemediation: false,
+      showEvidence: false,
+      showConflicts: false,
+      showKeyFindings: false,
+      showWinningSignal: false,
+    },
+    pro: {
+      allowedRiskLevels: ["LOW", "MEDIUM", "HIGH"],
+      showRemediation: true,
+      showEvidence: true,
+      showConflicts: false,
+      showKeyFindings: true,
+      showWinningSignal: false,
+    }
+  };
+
+  const limits = tierLimits[tier];
+  const isTooSevere = riskLevel === "CRITICAL" && tier !== "max";
+  const isHighGated = riskLevel === "HIGH" && tier === "lite";
+
+  if (isTooSevere || isHighGated) {
+    return {
+      tier,
+      assumption_verdict: verdict,
+      assumption_confidence: result.assumption_confidence,
+      timestamp: result.timestamp,
+      gated: true,
+      gated_reason: `${riskLevel} severity results require a higher tier`,
+      gated_message: tier === "lite"
+        ? `⚠️ This validation returned a ${riskLevel} severity issue. Upgrade to Pro ($1.00) for explanation and evidence, or Max ($2.50) for the complete remediation plan with step-by-step fix instructions.`
+        : `⚠️ This validation returned a CRITICAL severity issue. Upgrade to Max ($2.50) for the complete remediation plan, conflict analysis, and step-by-step fix instructions.`,
+      upgrade_options: tier === "lite" ? [
+        {
+          tier: "pro",
+          price: "$1.00",
+          unlocks: ["Full explanation", "Evidence breakdown", "Remediation steps", "HIGH severity access"]
+        },
+        {
+          tier: "max",
+          price: "$2.50",
+          unlocks: ["Complete remediation plan", "CRITICAL severity access", "Conflict detection", "Risk level", "Prevention tips", "Winning signal analysis"]
+        }
+      ] : [
+        {
+          tier: "max",
+          price: "$2.50",
+          unlocks: ["Complete remediation plan", "CRITICAL severity access", "Conflict detection", "Winning signal analysis", "Prevention tips"]
+        }
+      ],
+      preview: {
+        risk_level: riskLevel,
+        hint: verdict === "INVALID"
+          ? "Critical degradation detected in your AI system. Immediate action required."
+          : verdict === "CONFLICTED"
+          ? "Critical conflicts detected between your data sources. Resolution required before proceeding."
+          : "Critical issue detected. Upgrade to see full details and fix instructions."
+      }
+    };
+  }
+
+  const gatedResult: any = {
+    tier,
+    assumption_verdict: result.assumption_verdict,
+    assumption_confidence: result.assumption_confidence,
+    timestamp: result.timestamp,
+    gated: false,
+  };
+
+  if (tier === "lite") {
+    return gatedResult;
+  }
+
+  if (tier === "pro") {
+    return {
+      ...gatedResult,
+      explanation: result.explanation,
+      evidence: limits.showEvidence ? result.evidence : undefined,
+      key_findings: limits.showKeyFindings ? result.key_findings : undefined,
+      remediation: limits.showRemediation ? result.remediation : undefined,
+      upgrade_hint: result.risk_level === "HIGH"
+        ? "Upgrade to Max ($2.50) for conflict detection, risk scoring, and winning signal analysis."
+        : undefined
+    };
+  }
+
+  return gatedResult;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -572,16 +669,18 @@ export async function registerRoutes(
         result = evaluateLite(payload as any, nowIso);
       }
 
+      const gatedResult = gateSeverityByTier(result, tier);
+
       await storage.createSignal({
         agentId: agent_id,
         payload: payload,
-        insight: `${result.assumption_verdict ?? 'UNKNOWN'} (${tier.toUpperCase()})`,
-        confidence: result.assumption_confidence ?? 0.5
+        insight: `${gatedResult.assumption_verdict ?? 'UNKNOWN'} (${tier.toUpperCase()})${gatedResult.gated ? ' [GATED]' : ''}`,
+        confidence: gatedResult.assumption_confidence ?? 0.5
       });
 
       await storage.markSessionConsumed(sessionId);
 
-      return res.json({ success: true, data: result });
+      return res.json({ success: true, data: gatedResult });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({

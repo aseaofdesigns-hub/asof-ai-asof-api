@@ -177,13 +177,49 @@ export function RunAutomationForm() {
                     <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
                       <span>Conf: {(data.data.assumption_confidence * 100).toFixed(1)}%</span>
                       {data.data.risk_level && <span>Risk: {data.data.risk_level}</span>}
-                      <span>{new Date(data.data.timestamp).toLocaleTimeString()}</span>
+                      <span>{data.data.timestamp ? new Date(data.data.timestamp).toLocaleTimeString() : ""}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {data.data.remediation && (() => {
+              {data.data.gated && (
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                      data.data.preview?.risk_level === "CRITICAL" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"
+                    }`}>
+                      {data.data.preview?.risk_level} Severity
+                    </span>
+                    <span className="text-[8px] text-orange-300/60 font-mono">ACCESS RESTRICTED</span>
+                  </div>
+                  <p className="text-[9px] text-orange-200/70 leading-snug">{data.data.gated_message}</p>
+                  {data.data.preview?.hint && (
+                    <p className="text-[8px] text-orange-100/50 italic leading-tight">{data.data.preview.hint}</p>
+                  )}
+                  {data.data.upgrade_options?.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      {data.data.upgrade_options.map((opt: { tier: string; price: string; unlocks: string[] }) => (
+                        <div key={opt.tier} className="bg-white/5 border border-white/10 rounded p-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[9px] font-bold text-white/80 uppercase tracking-wider">{opt.tier}</span>
+                            <span className="text-[9px] font-mono text-emerald-400">{opt.price}</span>
+                          </div>
+                          <ul className="space-y-0.5">
+                            {opt.unlocks.map((u, i) => (
+                              <li key={i} className="text-[8px] text-white/40 flex gap-1">
+                                <span className="text-emerald-500/60">✓</span>{u}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!data.data.gated && data.data.remediation && (() => {
                 const rem = data.data.remediation;
                 return (
                   <>
