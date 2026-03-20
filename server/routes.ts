@@ -575,8 +575,8 @@ export async function registerRoutes(
       await storage.createSignal({
         agentId: agent_id,
         payload: payload,
-        insight: `${result.assumption_verdict} (${tier.toUpperCase()})`,
-        confidence: result.assumption_confidence
+        insight: `${result.assumption_verdict ?? 'UNKNOWN'} (${tier.toUpperCase()})`,
+        confidence: result.assumption_confidence ?? 0.5
       });
 
       await storage.markSessionConsumed(sessionId);
