@@ -32,15 +32,12 @@ export function useRunAutomation() {
       });
 
       if (!res.ok) {
-        if (res.status === 400) {
-          const error = api.automation.run.responses[400].parse(await res.json());
-          throw new Error(error.message || "Validation failed");
-        }
-        if (res.status === 500) {
-          const error = api.automation.run.responses[500].parse(await res.json());
-          throw new Error(error.message || "Internal server error");
-        }
-        throw new Error("Failed to run automation");
+        let body: any = {};
+        try { body = await res.json(); } catch {}
+        if (res.status === 400) throw new Error(body.message || "Validation failed");
+        if (res.status === 401) throw new Error(body.message || "Payment required");
+        if (res.status === 500) throw new Error(body.message || "Internal server error");
+        throw new Error(body.message || "Failed to run automation");
       }
 
       return api.automation.run.responses[200].parse(await res.json());

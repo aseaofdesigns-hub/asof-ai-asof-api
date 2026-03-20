@@ -9,7 +9,6 @@ import { Loader2, Play, CheckCircle2, Lock, DollarSign, Zap, ShieldCheck } from 
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
 
 type RemediationStep = {
   step: number;
@@ -78,14 +77,15 @@ export function RunAutomationForm() {
 
     try {
       const parsedPayload = JSON.parse(payload);
-      runAutomation({ 
-        agent_id: agentId, 
-        payload: parsedPayload,
-        sessionId: paidSessionId 
-      });
-      localStorage.removeItem("stripe_session_id");
-      setPaidSessionId(null);
-      queryClient.invalidateQueries({ queryKey: [api.automation.list.path] });
+      runAutomation(
+        { agent_id: agentId, payload: parsedPayload, sessionId: paidSessionId },
+        {
+          onSuccess: () => {
+            localStorage.removeItem("stripe_session_id");
+            setPaidSessionId(null);
+          },
+        }
+      );
     } catch (err) {
       setJsonError("Invalid JSON format");
     }
