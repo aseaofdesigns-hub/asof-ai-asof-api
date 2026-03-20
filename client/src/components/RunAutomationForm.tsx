@@ -139,7 +139,93 @@ export function RunAutomationForm() {
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col gap-4">
+      <CardContent className="flex-1 flex flex-col gap-4 overflow-y-auto">
+        <AnimatePresence>
+          {data && data.success && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden space-y-2"
+            >
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                  <div className="w-full">
+                    <h4 className="text-xs font-bold text-emerald-400 mb-0.5">Validation Complete</h4>
+                    <p className="text-[10px] text-emerald-100/70 mb-1 leading-tight font-mono font-semibold">
+                      {data.data.assumption_verdict}
+                    </p>
+                    {data.data.explanation && (
+                      <p className="text-[9px] text-emerald-100/50 italic mb-1 leading-tight">
+                        "{data.data.explanation}"
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
+                      <span>Conf: {(data.data.assumption_confidence * 100).toFixed(1)}%</span>
+                      {data.data.risk_level && <span>Risk: {data.data.risk_level}</span>}
+                      <span>{new Date(data.data.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {data.data.remediation && (() => {
+                const rem = data.data.remediation;
+                return (
+                  <>
+                    {rem.remediation_required && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Remediation Required</h4>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                            rem.severity === "CRITICAL" ? "bg-red-500/20 text-red-400" :
+                            rem.severity === "HIGH" ? "bg-orange-500/20 text-orange-400" :
+                            "bg-amber-500/20 text-amber-400"
+                          }`}>
+                            {rem.severity}
+                          </span>
+                        </div>
+                        <div className="space-y-1.5 mb-2">
+                          {rem.steps.map((s: RemediationStep) => (
+                            <div key={s.step} className="flex gap-2">
+                              <span className="text-[8px] font-mono text-amber-500/60 mt-0.5 shrink-0">#{s.step}</span>
+                              <div>
+                                <p className="text-[9px] font-semibold text-amber-300 leading-none">{s.action}</p>
+                                <p className="text-[8px] text-amber-100/50 leading-tight mt-0.5">{s.detail}</p>
+                                <span className={`text-[7px] font-bold uppercase tracking-wider ${
+                                  s.priority === "IMMEDIATE" ? "text-red-400" :
+                                  s.priority === "SHORT_TERM" ? "text-orange-400" : "text-blue-400"
+                                }`}>{s.priority.replace("_", " ")}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[8px] text-amber-100/40">
+                          Est. fix time: {rem.estimated_fix_time}
+                        </p>
+                      </div>
+                    )}
+
+                    {rem.prevention_tips?.length > 0 && (
+                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                        <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1.5">Prevention Tips</h4>
+                        <ul className="space-y-1">
+                          {rem.prevention_tips.map((tip: string, i: number) => (
+                            <li key={i} className="text-[8px] text-blue-100/50 flex gap-1.5">
+                              <span className="text-blue-400/60 shrink-0">•</span>{tip}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {isLocked ? (
           <div className="space-y-4">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Select Pricing Tier</p>
@@ -262,91 +348,6 @@ export function RunAutomationForm() {
           </form>
         )}
 
-        <AnimatePresence>
-          {data && data.success && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden mt-2 space-y-2"
-            >
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                  <div className="w-full">
-                    <h4 className="text-xs font-bold text-emerald-400 mb-0.5">Validation Complete</h4>
-                    <p className="text-[10px] text-emerald-100/70 mb-1 leading-tight font-mono font-semibold">
-                      {data.data.assumption_verdict}
-                    </p>
-                    {data.data.explanation && (
-                      <p className="text-[9px] text-emerald-100/50 italic mb-1 leading-tight">
-                        "{data.data.explanation}"
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
-                      <span>Conf: {(data.data.assumption_confidence * 100).toFixed(1)}%</span>
-                      {data.data.risk_level && <span>Risk: {data.data.risk_level}</span>}
-                      <span>{new Date(data.data.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {data.data.remediation && (() => {
-                const rem = data.data.remediation;
-                return (
-                  <>
-                    {rem.remediation_required && (
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Remediation Required</h4>
-                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                            rem.severity === "CRITICAL" ? "bg-red-500/20 text-red-400" :
-                            rem.severity === "HIGH" ? "bg-orange-500/20 text-orange-400" :
-                            "bg-amber-500/20 text-amber-400"
-                          }`}>
-                            {rem.severity}
-                          </span>
-                        </div>
-                        <div className="space-y-1.5 mb-2">
-                          {rem.steps.map((s: RemediationStep) => (
-                            <div key={s.step} className="flex gap-2">
-                              <span className="text-[8px] font-mono text-amber-500/60 mt-0.5 shrink-0">#{s.step}</span>
-                              <div>
-                                <p className="text-[9px] font-semibold text-amber-300 leading-none">{s.action}</p>
-                                <p className="text-[8px] text-amber-100/50 leading-tight mt-0.5">{s.detail}</p>
-                                <span className={`text-[7px] font-bold uppercase tracking-wider ${
-                                  s.priority === "IMMEDIATE" ? "text-red-400" :
-                                  s.priority === "SHORT_TERM" ? "text-orange-400" : "text-blue-400"
-                                }`}>{s.priority.replace("_", " ")}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-[8px] text-amber-100/40">
-                          Est. fix time: {rem.estimated_fix_time}
-                        </p>
-                      </div>
-                    )}
-
-                    {rem.prevention_tips?.length > 0 && (
-                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                        <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1.5">Prevention Tips</h4>
-                        <ul className="space-y-1">
-                          {rem.prevention_tips.map((tip: string, i: number) => (
-                            <li key={i} className="text-[8px] text-blue-100/50 flex gap-1.5">
-                              <span className="text-blue-400/60 shrink-0">•</span>{tip}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </CardContent>
     </Card>
   );
