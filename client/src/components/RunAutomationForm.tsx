@@ -275,8 +275,8 @@ export function RunAutomationForm() {
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                   <div className="w-full">
                     <h4 className="text-xs font-bold text-emerald-400 mb-0.5">Validation Complete</h4>
-                    <p className="text-[10px] text-emerald-100/70 mb-1 leading-tight">
-                      {data.data.insight}
+                    <p className="text-[10px] text-emerald-100/70 mb-1 leading-tight font-mono font-semibold">
+                      {data.data.assumption_verdict}
                     </p>
                     {data.data.explanation && (
                       <p className="text-[9px] text-emerald-100/50 italic mb-1 leading-tight">
@@ -284,7 +284,7 @@ export function RunAutomationForm() {
                       </p>
                     )}
                     <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
-                      <span>Conf: {(data.data.confidence * 100).toFixed(1)}%</span>
+                      <span>Conf: {(data.data.assumption_confidence * 100).toFixed(1)}%</span>
                       {data.data.risk_level && <span>Risk: {data.data.risk_level}</span>}
                       <span>{new Date(data.data.timestamp).toLocaleTimeString()}</span>
                     </div>
@@ -293,7 +293,7 @@ export function RunAutomationForm() {
               </div>
 
               {data.data.remediation && (() => {
-                const rem = data.data.remediation as Remediation;
+                const rem = data.data.remediation;
                 return (
                   <>
                     {rem.remediation_required && (

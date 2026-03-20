@@ -49,7 +49,7 @@ export function useRunAutomation() {
       queryClient.invalidateQueries({ queryKey: [api.automation.list.path] });
       toast({
         title: "Automation Complete",
-        description: `Signal generated with ${(data.data.confidence * 100).toFixed(0)}% confidence`,
+        description: `${data.data.assumption_verdict} — ${(data.data.assumption_confidence * 100).toFixed(0)}% confidence`,
         variant: "default",
       });
     },

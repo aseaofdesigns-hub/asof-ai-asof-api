@@ -45,11 +45,45 @@ export const api = {
         200: z.object({
           success: z.boolean(),
           data: z.object({
-            insight: z.string(),
-            confidence: z.number(),
-            evidence: z.array(z.any()).optional(),
+            tier: z.string(),
+            assumption_verdict: z.enum(['VALID', 'INVALID', 'CONFLICTED', 'UNKNOWN', 'STALE']),
+            assumption_confidence: z.number(),
+            timestamp: z.string(),
             explanation: z.string().optional(),
-            timestamp: z.string()
+            evidence: z.array(z.object({
+              source: z.string(),
+              assertion: z.string(),
+              last_verified_at: z.string().nullable(),
+              priority: z.number(),
+              signal_confidence: z.number(),
+            })).optional(),
+            risk_level: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+            signal_confidence: z.number().optional(),
+            key_findings: z.array(z.string()).optional(),
+            recommended_actions: z.array(z.string()).optional(),
+            conflicts: z.array(z.object({
+              between: z.array(z.string()),
+              type: z.string(),
+              detail: z.string(),
+            })).optional(),
+            winning_signal: z.object({
+              source: z.string(),
+              score: z.number(),
+              reason: z.string(),
+            }).nullable().optional(),
+            stale_days: z.number().optional(),
+            remediation: z.object({
+              remediation_required: z.boolean(),
+              severity: z.enum(['NONE', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+              steps: z.array(z.object({
+                step: z.number(),
+                action: z.string(),
+                detail: z.string(),
+                priority: z.enum(['IMMEDIATE', 'SHORT_TERM', 'LONG_TERM']),
+              })),
+              estimated_fix_time: z.string(),
+              prevention_tips: z.array(z.string()),
+            }).optional(),
           })
         }),
         400: errorSchemas.validation,
