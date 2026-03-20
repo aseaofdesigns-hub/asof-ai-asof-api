@@ -670,14 +670,12 @@ export async function registerRoutes(
           return res.status(400).json({ message: "webhook_url must be a valid public HTTPS URL" });
         }
       }
+      const parsedInterval = Number(check_interval_hours);
+      if (!Number.isFinite(parsedInterval) || parsedInterval < 0.25 || parsedInterval > 8760) {
+        return res.status(400).json({ message: "check_interval_hours must be between 0.25 and 8760" });
+      }
       const nowIso = safeIsoNow();
       const result = evaluateMax(payload, nowIso);
-      const remediation = generateRemediation(
-        result.assumption_verdict,
-        payload?.type ?? "unknown",
-        payload,
-        result.key_findings ?? []
-      );
       if (webhook_url && result.assumption_verdict !== "VALID") {
         try {
           const controller = new AbortController();
@@ -691,7 +689,7 @@ export async function registerRoutes(
               verdict: result.assumption_verdict,
               confidence: result.assumption_confidence,
               risk_level: result.risk_level,
-              remediation,
+              remediation: result.remediation,
               timestamp: nowIso
             }),
             signal: controller.signal
@@ -704,12 +702,12 @@ export async function registerRoutes(
       return res.json({
         success: true,
         monitor_id: `mon_${agent_id}_${Date.now()}`,
-        immediate_result: { ...result, remediation },
+        immediate_result: result,
         monitoring: {
           active: true,
-          check_interval_hours,
+          check_interval_hours: parsedInterval,
           webhook_url: webhook_url ?? null,
-          next_check: new Date(Date.now() + check_interval_hours * 3600000).toISOString()
+          next_check: new Date(Date.now() + parsedInterval * 3600000).toISOString()
         }
       });
     } catch (err) {
