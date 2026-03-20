@@ -638,11 +638,37 @@ export async function registerRoutes(
     }
   });
 
+  function isSafeWebhookUrl(raw: string): boolean {
+    let parsed: URL;
+    try { parsed = new URL(raw); } catch { return false; }
+    if (parsed.protocol !== "https:") return false;
+    const hostname = parsed.hostname.toLowerCase();
+    const privatePatterns = [
+      /^localhost$/,
+      /^127\./,
+      /^10\./,
+      /^172\.(1[6-9]|2\d|3[01])\./,
+      /^192\.168\./,
+      /^0\./,
+      /^::1$/,
+      /^fc00:/,
+      /^fe80:/,
+      /\.local$/,
+      /\.internal$/,
+    ];
+    return !privatePatterns.some(p => p.test(hostname));
+  }
+
   app.post('/api/monitor', async (req, res) => {
     try {
       const { agent_id, payload, webhook_url, check_interval_hours = 24 } = req.body;
       if (!agent_id || !payload) {
         return res.status(400).json({ message: "agent_id and payload required" });
+      }
+      if (webhook_url !== undefined && webhook_url !== null) {
+        if (typeof webhook_url !== "string" || !isSafeWebhookUrl(webhook_url)) {
+          return res.status(400).json({ message: "webhook_url must be a valid public HTTPS URL" });
+        }
       }
       const nowIso = safeIsoNow();
       const result = evaluateMax(payload, nowIso);
@@ -654,6 +680,8 @@ export async function registerRoutes(
       );
       if (webhook_url && result.assumption_verdict !== "VALID") {
         try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
           await fetch(webhook_url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -665,8 +693,10 @@ export async function registerRoutes(
               risk_level: result.risk_level,
               remediation,
               timestamp: nowIso
-            })
+            }),
+            signal: controller.signal
           });
+          clearTimeout(timeout);
         } catch (webhookErr) {
           console.warn("Webhook delivery failed:", webhookErr);
         }
