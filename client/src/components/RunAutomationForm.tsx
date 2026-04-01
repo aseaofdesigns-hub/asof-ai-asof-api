@@ -349,13 +349,53 @@ export function RunAutomationForm() {
         {isLocked ? (
           <div className="space-y-4">
             {freeTrialAvailable && (
-              <div className="space-y-2">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Free Trial</p>
+              <>
+                <div className="space-y-2 p-3 rounded-lg bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <Label htmlFor="agentId-free" className="text-xs font-bold text-white">
+                      Your Agent ID
+                    </Label>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Enter a unique identifier for your AI agent.
+                  </p>
+                  <Input
+                    id="agentId-free"
+                    data-testid="input-agent-id-free"
+                    value={agentId}
+                    onChange={(e) => setAgentId(e.target.value)}
+                    className="glass-input font-mono h-9 text-sm border-emerald-500/30 focus:border-emerald-400"
+                    placeholder="e.g. my-trading-bot-01"
+                  />
+                </div>
+
+                <div className="space-y-1 flex flex-col">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="payload-free" className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
+                      Operation Payload (JSON)
+                    </Label>
+                    {jsonError && (
+                      <span className="text-[9px] text-rose-400 font-medium animate-pulse">
+                        {jsonError}
+                      </span>
+                    )}
+                  </div>
+                  <Textarea
+                    id="payload-free"
+                    data-testid="input-payload-free"
+                    value={payload}
+                    onChange={(e) => setPayload(e.target.value)}
+                    className="glass-input font-mono text-[10px] min-h-[100px] resize-none leading-relaxed"
+                    spellCheck={false}
+                  />
+                </div>
+
                 <button
                   data-testid="button-free-trial"
                   onClick={handleFreeRun}
-                  disabled={freeTrialRunning}
-                  className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-left w-full group"
+                  disabled={freeTrialRunning || !agentId.trim()}
+                  className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-left w-full group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded bg-emerald-500/20">
@@ -363,7 +403,7 @@ export function RunAutomationForm() {
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-emerald-300 leading-none">Try ASOF Free</h4>
-                      <p className="text-[9px] text-emerald-400/60 mt-1">One free Lite-tier validation</p>
+                      <p className="text-[9px] text-emerald-400/60 mt-1">One free Lite-tier validation with your data</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -372,7 +412,13 @@ export function RunAutomationForm() {
                     </span>
                   </div>
                 </button>
-              </div>
+
+                <div className="flex items-center gap-3 py-1">
+                  <div className="flex-1 h-px bg-white/10" />
+                  <span className="text-[9px] text-muted-foreground uppercase tracking-widest">or pay for more</span>
+                  <div className="flex-1 h-px bg-white/10" />
+                </div>
+              </>
             )}
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Select Pricing Tier</p>
             <div className="grid grid-cols-1 gap-2">
