@@ -2,16 +2,12 @@ import type { Express } from "express";
 import type { Server } from "http";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { getUncachableStripeClient } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 type AsOfSignal = {
   source?: string;
@@ -560,11 +556,13 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   app.get('/openapi.json', (_req, res) => {
-    const specPath = path.resolve(__dirname, 'openapi.json');
-    const fallbackPath = path.resolve(process.cwd(), 'server', 'openapi.json');
-    const filePath = fs.existsSync(specPath) ? specPath : fallbackPath;
-    res.type('application/json');
-    res.sendFile(filePath);
+    const filePath = path.resolve(process.cwd(), 'server', 'openapi.json');
+    if (fs.existsSync(filePath)) {
+      res.type('application/json');
+      res.sendFile(filePath);
+    } else {
+      res.status(404).json({ message: "OpenAPI spec not found" });
+    }
   });
 
   app.post(api.payments.create.path, async (req, res) => {
