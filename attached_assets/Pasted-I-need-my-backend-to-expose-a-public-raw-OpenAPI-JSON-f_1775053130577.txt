@@ -1,0 +1,75 @@
+I need my backend to expose a public raw OpenAPI JSON file for my domain.
+
+Right now, `https://asofai.com/docs` works, but I also need:
+
+`https://asofai.com/openapi.json`
+
+to return the actual OpenAPI spec as raw JSON, not an HTML page.
+
+Please do the following:
+
+1. Make sure `/openapi.json` is publicly accessible on my deployed Replit app.
+2. Make sure it returns valid OpenAPI 3.x JSON.
+3. Make sure the response header is `Content-Type: application/json`.
+4. Do not route `/openapi.json` through the frontend or homepage.
+5. If the frontend is intercepting routes, add a backend route that serves the JSON file directly.
+6. Confirm that visiting `https://asofai.com/openapi.json` in a browser shows raw JSON only.
+
+If needed, create a file named `openapi.json` in the project and serve it from the backend.
+
+Use this minimal starter spec if one is needed:
+
+```json
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ASOF.ai API",
+    "version": "1.0.0",
+    "description": "AI validation API for verifying assumptions, signals, and datasets."
+  },
+  "servers": [
+    {
+      "url": "https://asofai.com"
+    }
+  ],
+  "paths": {
+    "/api/validate": {
+      "post": {
+        "summary": "Validate a claim or assumption",
+        "operationId": "validateAsof",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "claim": {
+                    "type": "string"
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": ["lite", "pro", "max"]
+                  }
+                },
+                "required": ["claim"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+After setting it up, test and confirm that:
+
+* `/docs` loads the docs page
+* `/openapi.json` returns raw JSON
+* the custom domain `https://asofai.com/openapi.json` also returns raw JSON

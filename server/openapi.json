@@ -1,0 +1,386 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ASOF.ai API",
+    "version": "1.0.0",
+    "description": "AI validation API for verifying assumptions, signals, and datasets. Pay-per-use with three tiers: Lite ($0.50), Pro ($1.00), Max ($2.50).",
+    "contact": {
+      "email": "Support@asofai.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://asofai.com"
+    }
+  ],
+  "paths": {
+    "/api/create-payment": {
+      "post": {
+        "summary": "Create a Stripe checkout session",
+        "operationId": "createPayment",
+        "tags": ["Payments"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tier": {
+                    "type": "string",
+                    "enum": ["lite", "pro", "max"],
+                    "description": "Pricing tier: lite ($0.50), pro ($1.00), max ($2.50)"
+                  }
+                },
+                "required": ["tier"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checkout session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "Stripe checkout URL to redirect the user"
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "description": "Stripe session ID for verification"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/verify-payment/{sessionId}": {
+      "get": {
+        "summary": "Verify a Stripe payment session",
+        "operationId": "verifyPayment",
+        "tags": ["Payments"],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stripe checkout session ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["paid", "unpaid", "expired"]
+                    },
+                    "tier": {
+                      "type": "string",
+                      "enum": ["lite", "pro", "max"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preflight": {
+      "post": {
+        "summary": "Free preflight check before running a paid validation",
+        "operationId": "preflight",
+        "tags": ["Automation"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent_id": {
+                    "type": "string",
+                    "description": "Your AI agent identifier"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "description": "The payload to validate (same format as /api/run)"
+                  }
+                },
+                "required": ["agent_id", "payload"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preflight analysis result (free, no payment required)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "preflight": {
+                      "type": "string",
+                      "enum": ["CLEAR", "REVIEW_RECOMMENDED"]
+                    },
+                    "checks": {
+                      "type": "object"
+                    },
+                    "recommended_tier": {
+                      "type": "string",
+                      "enum": ["lite", "pro", "max"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/run": {
+      "post": {
+        "summary": "Run an ASOF validation (requires paid session)",
+        "operationId": "runAutomation",
+        "tags": ["Automation"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent_id": {
+                    "type": "string",
+                    "description": "Your AI agent identifier"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "description": "Structured validation payload with asof_check, signals, and freshness data"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "Paid Stripe session ID (from /api/create-payment)"
+                  }
+                },
+                "required": ["agent_id", "payload", "sessionId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result (fields vary by tier)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tier": {
+                          "type": "string",
+                          "enum": ["lite", "pro", "max"]
+                        },
+                        "assumption_verdict": {
+                          "type": "string",
+                          "enum": ["VALID", "INVALID", "CONFLICTED", "UNKNOWN", "STALE"]
+                        },
+                        "assumption_confidence": {
+                          "type": "number",
+                          "description": "Confidence score between 0 and 1"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "explanation": {
+                          "type": "string",
+                          "description": "Pro and Max tiers only"
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "description": "Pro and Max tiers only",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "source": { "type": "string" },
+                              "assertion": { "type": "string" },
+                              "last_verified_at": { "type": "string", "nullable": true },
+                              "priority": { "type": "number" },
+                              "signal_confidence": { "type": "number" }
+                            }
+                          }
+                        },
+                        "risk_level": {
+                          "type": "string",
+                          "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+                          "description": "Max tier only"
+                        },
+                        "remediation": {
+                          "type": "object",
+                          "description": "Pro tier (non-CRITICAL) and Max tier",
+                          "properties": {
+                            "remediation_required": { "type": "boolean" },
+                            "severity": { "type": "string" },
+                            "steps": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "step": { "type": "number" },
+                                  "action": { "type": "string" },
+                                  "detail": { "type": "string" },
+                                  "priority": { "type": "string", "enum": ["IMMEDIATE", "SHORT_TERM", "LONG_TERM"] }
+                                }
+                              }
+                            },
+                            "estimated_fix_time": { "type": "string" },
+                            "prevention_tips": { "type": "array", "items": { "type": "string" } }
+                          }
+                        },
+                        "gated": {
+                          "type": "boolean",
+                          "description": "True if result fields are restricted by tier"
+                        },
+                        "gated_message": {
+                          "type": "string",
+                          "description": "Upgrade prompt when gated is true"
+                        },
+                        "upgrade_options": {
+                          "type": "array",
+                          "description": "Available tier upgrades when gated",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tier": { "type": "string" },
+                              "price": { "type": "string" },
+                              "unlocks": { "type": "array", "items": { "type": "string" } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Payment required or session already consumed"
+          }
+        }
+      }
+    },
+    "/api/monitor": {
+      "post": {
+        "summary": "Create a recurring validation monitor (free)",
+        "operationId": "createMonitor",
+        "tags": ["Monitoring"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent_id": {
+                    "type": "string",
+                    "description": "Your AI agent identifier"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "description": "The payload to monitor"
+                  },
+                  "webhook_url": {
+                    "type": "string",
+                    "description": "URL to receive monitoring alerts"
+                  },
+                  "interval": {
+                    "type": "string",
+                    "enum": ["hourly", "daily", "weekly"],
+                    "description": "How often to check"
+                  }
+                },
+                "required": ["agent_id", "payload"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Monitor created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "monitor_id": { "type": "string" },
+                    "status": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/signals": {
+      "get": {
+        "summary": "Retrieve signal history",
+        "operationId": "listSignals",
+        "tags": ["Signals"],
+        "responses": {
+          "200": {
+            "description": "List of all automation signals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "agentId": { "type": "string" },
+                      "payload": { "type": "object" },
+                      "insight": { "type": "string" },
+                      "confidence": { "type": "number" },
+                      "timestamp": { "type": "string", "format": "date-time" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
