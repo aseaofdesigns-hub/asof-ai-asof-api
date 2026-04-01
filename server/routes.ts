@@ -216,6 +216,164 @@ function generateRemediation(
   return { remediation_required: false, severity: "NONE", steps: [], estimated_fix_time: "N/A", prevention_tips: [] };
 }
 
+function analyzeAsofPayload(payload: any, nowIso: string): {
+  verdict: "VALID" | "INVALID" | "CONFLICTED" | "UNKNOWN" | "STALE";
+  confidence: number;
+  reason: string;
+} {
+  const asof = payload?.asof ?? {};
+  const claim = asof.claim ?? payload?.claim ?? "";
+  const signals = Array.isArray(asof.signals) ? asof.signals : [];
+  const freshness = asof.freshness ?? {};
+  const context = asof.context ?? {};
+  const subject = asof.subject ?? {};
+  const nowMs = Date.now();
+
+  if (freshness.stale_after) {
+    const staleMs = parseIsoMs(freshness.stale_after);
+    if (staleMs && nowMs > staleMs) {
+      const ageDays = Math.round((nowMs - staleMs) / 86400000);
+      return {
+        verdict: "STALE",
+        confidence: 0.95,
+        reason: `Data expired ${ageDays > 0 ? ageDays + ' day(s) ago' : 'recently'} (stale_after: ${freshness.stale_after})`
+      };
+    }
+  }
+
+  if (freshness.max_age_seconds && freshness.last_verified_at) {
+    const verifiedMs = parseIsoMs(freshness.last_verified_at);
+    if (verifiedMs) {
+      const ageSec = (nowMs - verifiedMs) / 1000;
+      if (ageSec > freshness.max_age_seconds) {
+        return {
+          verdict: "STALE",
+          confidence: 0.92,
+          reason: `Last verified ${Math.round(ageSec / 3600)} hours ago, exceeding max age of ${Math.round(freshness.max_age_seconds / 3600)} hours`
+        };
+      }
+    }
+  }
+
+  if (signals.length >= 2) {
+    const positiveSignals: any[] = [];
+    const negativeSignals: any[] = [];
+
+    for (const s of signals) {
+      const name = txt(s.name ?? s.key ?? s.source ?? "");
+      const value = s.value;
+      const weight = typeof s.weight === "number" ? s.weight : 0.5;
+
+      const isNegative =
+        value === false ||
+        value === "fail" ||
+        value === "failed" ||
+        value === "flagged" ||
+        value === "flagged_review" ||
+        value === "expired" ||
+        value === "unknown" ||
+        value === "partial" ||
+        value === "denied" ||
+        value === "rejected" ||
+        /flag|fail|denied|reject|expired|missing|incomplete|unknown|violation|breach|exceed/i.test(String(value)) ||
+        /flag|fail|denied|reject|expired|missing|incomplete|violation|breach|exceed/i.test(name);
+
+      const isPositive =
+        value === true ||
+        value === "clear" ||
+        value === "pass" ||
+        value === "passed" ||
+        value === "verified" ||
+        value === "approved" ||
+        value === "compliant" ||
+        /clear|pass|verified|approved|compliant|valid|confirmed|complete/i.test(String(value));
+
+      if (isNegative) negativeSignals.push({ ...s, weight });
+      else if (isPositive) positiveSignals.push({ ...s, weight });
+    }
+
+    const posWeight = positiveSignals.reduce((sum, s) => sum + (s.weight || 0.5), 0);
+    const negWeight = negativeSignals.reduce((sum, s) => sum + (s.weight || 0.5), 0);
+    const totalWeight = posWeight + negWeight;
+
+    if (negativeSignals.length > 0 && positiveSignals.length > 0) {
+      if (Math.abs(posWeight - negWeight) < totalWeight * 0.2) {
+        return {
+          verdict: "CONFLICTED",
+          confidence: clamp01(0.65 + totalWeight * 0.05),
+          reason: `Conflicting signals: ${positiveSignals.length} positive vs ${negativeSignals.length} negative with similar weight`
+        };
+      }
+      if (negWeight > posWeight) {
+        return {
+          verdict: "INVALID",
+          confidence: clamp01(0.70 + (negWeight / totalWeight) * 0.2),
+          reason: `Negative signals outweigh positive: ${negativeSignals.map(s => s.name || s.key || 'signal').join(', ')} flagged`
+        };
+      }
+      return {
+        verdict: "VALID",
+        confidence: clamp01(0.60 + (posWeight / totalWeight) * 0.2),
+        reason: `Positive signals dominate but ${negativeSignals.length} concern(s) noted`
+      };
+    }
+
+    if (negativeSignals.length > 0 && positiveSignals.length === 0) {
+      return {
+        verdict: "INVALID",
+        confidence: clamp01(0.75 + negWeight * 0.1),
+        reason: `All evaluated signals indicate issues: ${negativeSignals.map(s => s.name || s.key || 'signal').join(', ')}`
+      };
+    }
+
+    if (positiveSignals.length > 0 && negativeSignals.length === 0) {
+      return {
+        verdict: "VALID",
+        confidence: clamp01(0.70 + posWeight * 0.1),
+        reason: `All evaluated signals support the claim`
+      };
+    }
+  }
+
+  if (signals.length === 1) {
+    const s = signals[0];
+    const value = s.value;
+    const isNeg =
+      value === false || value === "fail" || value === "failed" || value === "flagged_review" ||
+      value === "partial" || value === "unknown" || value === "denied" ||
+      /flag|fail|denied|reject|expired/i.test(String(value));
+    const isPos =
+      value === true || value === "clear" || value === "pass" || value === "verified" ||
+      /clear|pass|verified|approved|compliant/i.test(String(value));
+
+    if (isNeg) return { verdict: "INVALID", confidence: 0.68, reason: `Single signal '${s.name || s.key || 'signal'}' indicates an issue (value: ${value})` };
+    if (isPos) return { verdict: "VALID", confidence: 0.65, reason: `Single signal '${s.name || s.key || 'signal'}' supports the claim (value: ${value})` };
+  }
+
+  const riskTolerance = txt(context.risk_tolerance ?? "");
+  if (riskTolerance === "low" && signals.length > 0) {
+    return {
+      verdict: "INVALID",
+      confidence: 0.60,
+      reason: "Low risk tolerance with ambiguous signals — conservative verdict applied"
+    };
+  }
+
+  if (claim && signals.length === 0) {
+    return {
+      verdict: "UNKNOWN",
+      confidence: 0.40,
+      reason: "Claim provided but no signals to evaluate"
+    };
+  }
+
+  return {
+    verdict: "UNKNOWN",
+    confidence: 0.45,
+    reason: "Insufficient data to determine verdict"
+  };
+}
+
 function evaluateLite(payload: AsOfPayload, nowIso: string) {
   const type = payload?.type ?? "unknown";
   const asof = payload?.asof_check ?? {};
@@ -248,6 +406,12 @@ function evaluateLite(payload: AsOfPayload, nowIso: string) {
       assumption_verdict = "VALID";
       assumption_confidence = 0.6;
     }
+  }
+
+  if (assumption_verdict === "UNKNOWN") {
+    const generic = analyzeAsofPayload(payload, nowIso);
+    assumption_verdict = generic.verdict;
+    assumption_confidence = generic.confidence;
   }
 
   return {
@@ -392,6 +556,19 @@ function evaluateMax(payload: AsOfPayload, nowIso: string) {
       risk_level = "MEDIUM";
       key_findings = ["No clear service-standard window detected in provided signals."];
       if (!recommended_actions.length) recommended_actions = ["PROVIDE_BETTER_SIGNALS"];
+    }
+  }
+
+  if (assumption_verdict === "UNKNOWN") {
+    const generic = analyzeAsofPayload(payload, nowIso);
+    assumption_verdict = generic.verdict;
+    key_findings = [generic.reason];
+    if (generic.verdict === "STALE") risk_level = "HIGH";
+    else if (generic.verdict === "INVALID") risk_level = "HIGH";
+    else if (generic.verdict === "CONFLICTED") risk_level = "HIGH";
+    else if (generic.verdict === "VALID") risk_level = "LOW";
+    if (!recommended_actions.length) {
+      recommended_actions = generic.verdict === "VALID" ? ["MONITOR"] : generic.verdict === "STALE" ? ["REFRESH_DATA", "RE_VERIFY"] : ["REVIEW_SIGNALS", "ADD_MORE_CONTEXT"];
     }
   }
 
