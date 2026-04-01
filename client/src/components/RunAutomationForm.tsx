@@ -34,11 +34,23 @@ const DEFAULT_JSON = JSON.stringify({
   }
 }, null, 2);
 
+function getFingerprint(): string {
+  let fp = localStorage.getItem("asof_fp");
+  if (!fp) {
+    fp = `fp_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem("asof_fp", fp);
+  }
+  return fp;
+}
+
 export function RunAutomationForm() {
   const [agentId, setAgentId] = useState("agent-001");
   const [payload, setPayload] = useState(DEFAULT_JSON);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
+  const [freeTrialAvailable, setFreeTrialAvailable] = useState<boolean | null>(null);
+  const [freeTrialRunning, setFreeTrialRunning] = useState(false);
+  const [freeTrialData, setFreeTrialData] = useState<any>(null);
   const { toast } = useToast();
   
   const { mutate: runAutomation, isPending: isRunning, data } = useRunAutomation();
@@ -53,6 +65,12 @@ export function RunAutomationForm() {
       }
     };
     window.addEventListener("storage", onStorage);
+
+    fetch(`/api/free-trial-status?fingerprint=${getFingerprint()}`)
+      .then(r => r.json())
+      .then(d => setFreeTrialAvailable(d.available))
+      .catch(() => setFreeTrialAvailable(false));
+
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
@@ -83,6 +101,48 @@ export function RunAutomationForm() {
     }
   };
 
+  const handleFreeRun = async () => {
+    setJsonError(null);
+    try {
+      const parsedPayload = JSON.parse(payload);
+      setFreeTrialRunning(true);
+      const res = await fetch('/api/free-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: agentId,
+          payload: parsedPayload,
+          fingerprint: getFingerprint()
+        })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        if (result.trial_exhausted) {
+          setFreeTrialAvailable(false);
+        }
+        throw new Error(result.message || "Free trial failed");
+      }
+      setFreeTrialData(result);
+      setFreeTrialAvailable(false);
+      toast({
+        title: "Free Trial Complete",
+        description: `${result.data.assumption_verdict} — ${(result.data.assumption_confidence * 100).toFixed(0)}% confidence`,
+      });
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        setJsonError("Invalid JSON format");
+      } else {
+        toast({
+          title: "Free Trial Failed",
+          description: err instanceof Error ? err.message : "Something went wrong",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setFreeTrialRunning(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!paidSessionId) return;
@@ -105,6 +165,9 @@ export function RunAutomationForm() {
   };
 
   const isLocked = !paidSessionId;
+
+  const displayResult = freeTrialData || (data?.success ? data : null);
+  const d = displayResult?.data || null;
 
   const tiers = [
     {
@@ -154,7 +217,7 @@ export function RunAutomationForm() {
       
       <CardContent className="flex-1 flex flex-col gap-4 overflow-y-auto">
         <AnimatePresence>
-          {data && data.success && (
+          {d && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -165,47 +228,49 @@ export function RunAutomationForm() {
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                   <div className="w-full">
-                    <h4 className="text-xs font-bold text-emerald-400 mb-0.5">Validation Complete</h4>
+                    <h4 className="text-xs font-bold text-emerald-400 mb-0.5">
+                      {freeTrialData ? "Free Trial Complete" : "Validation Complete"}
+                    </h4>
                     <p className="text-[10px] text-emerald-100/70 mb-1 leading-tight font-mono font-semibold">
-                      {data.data.assumption_verdict}
+                      {d.assumption_verdict}
                     </p>
-                    {data.data.explanation && (
+                    {d.explanation && (
                       <p className="text-[9px] text-emerald-100/50 italic mb-1 leading-tight">
-                        "{data.data.explanation}"
+                        "{d.explanation}"
                       </p>
                     )}
                     <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
-                      <span>Conf: {(data.data.assumption_confidence * 100).toFixed(1)}%</span>
-                      {data.data.risk_level && <span>Risk: {data.data.risk_level}</span>}
-                      <span>{data.data.timestamp ? new Date(data.data.timestamp).toLocaleTimeString() : ""}</span>
+                      <span>Conf: {(d.assumption_confidence * 100).toFixed(1)}%</span>
+                      {d.risk_level && <span>Risk: {d.risk_level}</span>}
+                      <span>{d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : ""}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {data.data.gated && (
+              {d.gated && (
                 <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    {data.data.preview?.risk_level ? (
+                    {d.preview?.risk_level ? (
                       <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                        data.data.preview.risk_level === "CRITICAL" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"
+                        d.preview.risk_level === "CRITICAL" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"
                       }`}>
-                        {data.data.preview.risk_level} Severity
+                        {d.preview.risk_level} Severity
                       </span>
                     ) : (
                       <span className="text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-orange-500/20 text-orange-400">
-                        Lite Tier
+                        {freeTrialData ? "Free Trial" : "Lite Tier"}
                       </span>
                     )}
                     <span className="text-[8px] text-orange-300/60 font-mono">ACCESS RESTRICTED</span>
                   </div>
-                  <p className="text-[9px] text-orange-200/70 leading-snug">{data.data.gated_message}</p>
-                  {data.data.preview?.hint && (
-                    <p className="text-[8px] text-orange-100/50 italic leading-tight">{data.data.preview.hint}</p>
+                  <p className="text-[9px] text-orange-200/70 leading-snug">{d.gated_message}</p>
+                  {d.preview?.hint && (
+                    <p className="text-[8px] text-orange-100/50 italic leading-tight">{d.preview.hint}</p>
                   )}
-                  {data.data.upgrade_options?.length > 0 && (
+                  {d.upgrade_options?.length > 0 && (
                     <div className="space-y-1.5 pt-1">
-                      {data.data.upgrade_options.map((opt: { tier: string; price: string; unlocks: string[] }) => (
+                      {d.upgrade_options.map((opt: { tier: string; price: string; unlocks: string[] }) => (
                         <div key={opt.tier} className="bg-white/5 border border-white/10 rounded p-2">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-[9px] font-bold text-white/80 uppercase tracking-wider">{opt.tier}</span>
@@ -225,8 +290,8 @@ export function RunAutomationForm() {
                 </div>
               )}
 
-              {!data.data.gated && data.data.remediation && (() => {
-                const rem = data.data.remediation;
+              {!d.gated && d.remediation && (() => {
+                const rem = d.remediation;
                 return (
                   <>
                     {rem.remediation_required && (
@@ -283,6 +348,32 @@ export function RunAutomationForm() {
 
         {isLocked ? (
           <div className="space-y-4">
+            {freeTrialAvailable && (
+              <div className="space-y-2">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Free Trial</p>
+                <button
+                  data-testid="button-free-trial"
+                  onClick={handleFreeRun}
+                  disabled={freeTrialRunning}
+                  className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-left w-full group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded bg-emerald-500/20">
+                      <Zap className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-emerald-300 leading-none">Try ASOF Free</h4>
+                      <p className="text-[9px] text-emerald-400/60 mt-1">One free Lite-tier validation</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-emerald-400">
+                      {freeTrialRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : "FREE"}
+                    </span>
+                  </div>
+                </button>
+              </div>
+            )}
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Select Pricing Tier</p>
             <div className="grid grid-cols-1 gap-2">
               {tiers.map((tier) => (

@@ -726,6 +726,50 @@ export async function registerRoutes(
     res.json(list);
   });
 
+  app.post('/api/free-run', async (req, res) => {
+    try {
+      const { agent_id, payload, fingerprint } = req.body;
+      if (!agent_id || !payload || !fingerprint) {
+        return res.status(400).json({ message: "agent_id, payload, and fingerprint are required" });
+      }
+
+      const alreadyUsed = await storage.hasUsedFreeTrial(fingerprint);
+      if (alreadyUsed) {
+        return res.status(403).json({
+          message: "Free trial already used. Purchase a Lite ($0.50), Pro ($1.00), or Max ($2.50) validation to continue.",
+          trial_exhausted: true
+        });
+      }
+
+      const nowIso = safeIsoNow();
+      const result = evaluateLite(payload as any, nowIso);
+      const gatedResult = gateSeverityByTier(result, "lite");
+
+      await storage.markFreeTrialUsed(fingerprint);
+
+      await storage.createSignal({
+        agentId: agent_id,
+        payload: payload,
+        insight: `${gatedResult.assumption_verdict ?? 'UNKNOWN'} (FREE TRIAL)${gatedResult.gated ? ' [GATED]' : ''}`,
+        confidence: gatedResult.assumption_confidence ?? 0.5
+      });
+
+      return res.json({ success: true, data: gatedResult, free_trial: true });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get('/api/free-trial-status', async (req, res) => {
+    const fingerprint = req.query.fingerprint as string;
+    if (!fingerprint) return res.json({ available: false });
+    const used = await storage.hasUsedFreeTrial(fingerprint);
+    return res.json({ available: !used });
+  });
+
   app.post('/api/preflight', async (req, res) => {
     try {
       const { assumption, context, urgency = "normal" } = req.body;

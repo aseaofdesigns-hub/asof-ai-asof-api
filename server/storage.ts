@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { signals, payments, type InsertSignal, type Signal, type Payment } from "@shared/schema";
+import { signals, payments, freeTrials, type InsertSignal, type Signal, type Payment } from "@shared/schema";
 import { desc, eq } from "drizzle-orm";
 
 export interface IStorage {
@@ -9,6 +9,8 @@ export interface IStorage {
   getPaymentBySessionId(sessionId: string): Promise<Payment | undefined>;
   updatePaymentStatus(sessionId: string, status: string): Promise<Payment>;
   markSessionConsumed(sessionId: string): Promise<Payment>;
+  hasUsedFreeTrial(fingerprint: string): Promise<boolean>;
+  markFreeTrialUsed(fingerprint: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -50,6 +52,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(payments.stripeSessionId, sessionId))
       .returning();
     return payment;
+  }
+
+  async hasUsedFreeTrial(fingerprint: string): Promise<boolean> {
+    const [trial] = await db.select().from(freeTrials).where(eq(freeTrials.fingerprint, fingerprint));
+    return !!trial?.used;
+  }
+
+  async markFreeTrialUsed(fingerprint: string): Promise<void> {
+    await db.insert(freeTrials)
+      .values({ fingerprint, used: true })
+      .onConflictDoUpdate({ target: freeTrials.fingerprint, set: { used: true } });
   }
 }
 

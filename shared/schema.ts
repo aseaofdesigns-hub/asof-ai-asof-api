@@ -21,6 +21,13 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const freeTrials = pgTable("free_trials", {
+  id: serial("id").primaryKey(),
+  fingerprint: text("fingerprint").notNull().unique(),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertSignalSchema = createInsertSchema(signals).omit({ 
   id: true,
   timestamp: true 
