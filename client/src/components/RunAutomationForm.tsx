@@ -3,130 +3,84 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, ChevronDown, ChevronUp, Sparkles, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import type { CodeAnalysisResult } from "@shared/routes";
 import jsPDF from "jspdf";
 
-const DEMO_CODE = `// AI-generated: charge customer and save order
-async function processOrder(userId, cartItems) {
-  const total = cartItems.reduce((sum, item) => sum + item.price, 0);
-
+const EXAMPLE_CODE = `async function chargeCardAndSaveOrder(userId, cartItems, paymentMethodId) {
+  // Get user from database
+  const user = await db.users.findOne({ id: userId });
+  
+  // Calculate total
+  const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  
+  // Charge the card via Stripe
   const charge = await stripe.charges.create({
     amount: total,
     currency: 'usd',
-    customer: userId,
-    description: 'Order payment'
+    customer: user.stripeCustomerId,
+    payment_method: paymentMethodId,
   });
-
+  
+  // Save order to database
   const order = await db.orders.create({
-    userId: userId,
+    userId,
     items: cartItems,
-    total: total,
-    stripeChargeId: charge.id,
-    status: 'paid'
+    total,
+    chargeId: charge.id,
+    status: 'paid',
   });
-
+  
+  // Send confirmation email
+  await emailService.send({
+    to: user.email,
+    subject: 'Order confirmed!',
+    body: \`Your order #\${order.id} has been placed.\`,
+  });
+  
   return order;
 }`;
 
-const DEMO_PROMPT = "Build a function that charges a customer's card and saves their order to the database";
-
-const DEMO_RESULT: CodeAnalysisResult = {
+const EXAMPLE_RESULT: CodeAnalysisResult = {
   risk_level: "RISKY",
-  summary: "This function charges the customer using userId as a Stripe customer ID without verifying it exists, and treats item.price as already being in cents — if prices are stored in dollars, customers will be overcharged by 100×. A DB failure after a successful charge will silently lose money.",
-  tier: "max (demo)",
+  summary:
+    "This AI-generated function charges a card and creates an order in two separate steps with no transaction safety. If the database write fails after the charge succeeds, you'll have a customer billed but no order record — with no automatic rollback or retry logic.",
   assumptions: [
-    { text: "The AI assumed userId is a valid Stripe customer ID — it may be an internal DB user ID, which will cause a Stripe error or charge the wrong customer.", severity: "HIGH" },
-    { text: "The AI assumed item.price is already in cents. If your app stores prices in dollars (e.g. 29.99), Stripe will charge $2,999.", severity: "HIGH" },
-    { text: "The AI assumed no duplicate order protection is needed — a network retry or double-click will create two charges.", severity: "MEDIUM" },
-    { text: "The AI assumed the charge always succeeds before the DB insert — there is no rollback if the database fails after money is taken.", severity: "HIGH" },
+    { severity: "HIGH", text: "Assumes the Stripe charge will always complete before the database write, with no handling for partial failures between the two operations." },
+    { severity: "HIGH", text: "Assumes `user.stripeCustomerId` always exists — if the user has no saved Stripe customer, this silently passes `undefined` to Stripe." },
+    { severity: "MEDIUM", text: "Assumes `total` is already in the correct currency's smallest unit (cents for USD). If `item.price` is in dollars, the charge will be 100× too small." },
+    { severity: "LOW", text: "Assumes `emailService.send` failures are non-critical and can be ignored without alerting the caller." },
   ],
   risks: [
-    { text: "100× overcharge if item.price is in dollars instead of cents — Stripe receives the raw float as cents.", severity: "HIGH" },
-    { text: "Orphaned charge: if db.orders.create throws, Stripe has the money but no order exists in your system.", severity: "HIGH" },
-    { text: "Double-charge on retry: no Stripe idempotency key means a network timeout retry creates a second charge.", severity: "MEDIUM" },
-    { text: "No authorization check — any userId can be passed in, so one user could trigger a charge on another user's saved card.", severity: "HIGH" },
+    { severity: "HIGH", text: "No try/catch: any uncaught exception leaves the user charged but without an order, with no compensation or rollback path." },
+    { severity: "HIGH", text: "Race condition: two simultaneous calls for the same cart could create duplicate charges before either order is committed." },
+    { severity: "MEDIUM", text: "No idempotency key on the Stripe charge — retrying on a network timeout will create a second charge." },
+    { severity: "LOW", text: "Order confirmation email is sent synchronously; a slow email provider will block the entire request." },
   ],
   checks: [
-    "Confirm item.price unit: is it dollars or cents? Multiply by 100 if dollars before passing to Stripe.",
-    "Verify userId is a Stripe customer ID (starts with 'cus_'), not an internal user ID.",
-    "Add a Stripe idempotency key (e.g. based on cart hash + userId) to prevent double-charging on retry.",
-    "Wrap the charge + DB insert in a try/catch that issues a Stripe refund if the DB insert fails.",
-    "Add an ownership check to confirm the userId matches the authenticated session before charging.",
+    "Verify `item.price` units — confirm they are already in cents, not dollars",
+    "Confirm all users have a `stripeCustomerId` before this function is reachable",
+    "Add a Stripe idempotency key tied to `userId + cartItems` hash",
+    "Wrap the charge + order creation in a try/catch with a Stripe refund in the catch block",
+    "Test what happens when the DB write fails after a successful charge",
   ],
   suggestions: [
     {
-      problem: "Prices may not be in cents",
-      why_it_matters: "Stripe requires amounts in the smallest currency unit (cents). If item.price is 29.99 dollars, Stripe charges $2,999.",
-      fix: "Multiply by 100: amount: Math.round(total * 100) — or store prices in cents throughout your app.",
+      problem: "No atomic transaction between charge and order creation",
+      why_it_matters: "A server crash between the two steps will bill the customer without creating an order, requiring manual reconciliation.",
+      fix: "Use a database transaction and only confirm the Stripe charge (capture it) after the order row is committed — or store the charge ID first and mark the order as `pending_capture`.",
     },
     {
-      problem: "No idempotency key on Stripe charge",
-      why_it_matters: "If the request times out and retries, Stripe creates a second charge. The customer gets billed twice.",
-      fix: "Add idempotencyKey: { idempotencyKey: `order-${userId}-${cartHash}` } to the stripe.charges.create call.",
-    },
-    {
-      problem: "No rollback if DB insert fails after charge",
-      why_it_matters: "Stripe takes the money, then if db.orders.create throws, the order is never recorded. You have a payment with no order.",
-      fix: "Wrap both calls in try/catch. If the DB insert fails, call stripe.refunds.create({ charge: charge.id }) before rethrowing.",
-    },
-    {
-      problem: "Missing authorization check",
-      why_it_matters: "Nothing confirms the caller owns the userId being charged. A logged-in user could pass someone else's userId.",
-      fix: "Compare userId to the authenticated session user ID before processing: if (userId !== req.user.id) throw new Error('Unauthorized').",
+      problem: "Missing Stripe idempotency key",
+      why_it_matters: "Network retries on a timeout will create duplicate real charges on the customer's card.",
+      fix: "Add `idempotencyKey: \`order-\${userId}-\${cartHash}\`` to every `stripe.charges.create` call.",
     },
   ],
-  safer_code: `// Safer version: explicit cents conversion, idempotency, rollback, auth check
-async function processOrder(authenticatedUserId, cartItems) {
-  // 1. Authorization: only charge the authenticated user
-  if (!authenticatedUserId) throw new Error('Unauthorized: no authenticated user');
-
-  // 2. Look up the Stripe customer ID — never use internal user IDs directly
-  const user = await db.users.findById(authenticatedUserId);
-  if (!user?.stripeCustomerId) throw new Error('No payment method on file');
-
-  // 3. Convert prices to cents explicitly (assumes item.price is in dollars)
-  const totalCents = Math.round(
-    cartItems.reduce((sum, item) => sum + item.price, 0) * 100
-  );
-
-  // 4. Create a stable idempotency key to prevent double-charges on retry
-  const cartHash = cartItems.map(i => i.id + ':' + i.qty).join(',');
-  const idempotencyKey = \`order-\${authenticatedUserId}-\${Buffer.from(cartHash).toString('base64').slice(0, 16)}\`;
-
-  let charge;
-  try {
-    charge = await stripe.charges.create(
-      { amount: totalCents, currency: 'usd', customer: user.stripeCustomerId, description: 'Order payment' },
-      { idempotencyKey }
-    );
-  } catch (stripeErr) {
-    throw new Error(\`Payment failed: \${stripeErr.message}\`);
-  }
-
-  // 5. Save the order — if this fails, refund the charge
-  let order;
-  try {
-    order = await db.orders.create({
-      userId: authenticatedUserId,
-      items: cartItems,
-      totalCents,
-      stripeChargeId: charge.id,
-      status: 'paid',
-    });
-  } catch (dbErr) {
-    // Rollback: refund the charge so money isn't lost
-    await stripe.refunds.create({ charge: charge.id });
-    throw new Error('Order could not be saved; payment has been refunded.');
-  }
-
-  return order;
-}`,
+  tier: "max",
   gated: false,
 };
-
 function getFingerprint(): string {
   let fp = localStorage.getItem("asof_fp");
   if (!fp) {
@@ -239,14 +193,20 @@ export function RunAutomationForm() {
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
   const [freeTrialAvailable, setFreeTrialAvailable] = useState<boolean | null>(null);
   const [showSaferCode, setShowSaferCode] = useState(false);
+  const [showExampleResult, setShowExampleResult] = useState(false);
+  const [isExampleLoaded, setIsExampleLoaded] = useState(false);
   const { toast } = useToast();
 
-  const loadDemo = () => {
-    setCode(DEMO_CODE);
-    setUserPrompt(DEMO_PROMPT);
-    setResult(DEMO_RESULT);
-    setIsDemo(true);
-    setShowSaferCode(true);
+  const loadExample = () => {
+    setCode(EXAMPLE_CODE);
+    setUserPrompt("Build a function that charges a user's card and saves the order to the database");
+    setIsExampleLoaded(true);
+    setResult(null);
+    setShowExampleResult(false);
+  };
+
+  const showMockResult = () => {
+    setShowExampleResult(v => !v);
   };
 
   useEffect(() => {
@@ -337,7 +297,7 @@ export function RunAutomationForm() {
           </div>
           <button
             data-testid="button-load-demo"
-            onClick={loadDemo}
+            onClick={loadExample}
             className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all"
           >
             ✨ Try an example
@@ -347,6 +307,32 @@ export function RunAutomationForm() {
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
+        {/* Example CTA banner */}
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-primary/8 border border-primary/20 backdrop-blur-sm">
+          <Sparkles className="w-4 h-4 text-primary shrink-0" />
+          <p className="text-xs text-white/70 flex-1">New here? See what ASOF finds in real AI-generated code.</p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              data-testid="button-try-example"
+              onClick={loadExample}
+              className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 transition-all"
+            >
+              <Sparkles className="w-3 h-3" />
+              Try an example
+            </button>
+            {isExampleLoaded && (
+              <button
+                data-testid="button-see-example-result"
+                onClick={showMockResult}
+                className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/25 transition-all"
+              >
+                <Eye className="w-3 h-3" />
+                {showExampleResult ? "Hide result" : "See result"}
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Code input */}
         <div className="space-y-2">
           <Label htmlFor="code-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -356,7 +342,7 @@ export function RunAutomationForm() {
             id="code-input"
             data-testid="input-code"
             value={code}
-            onChange={e => setCode(e.target.value)}
+            onChange={e => { setCode(e.target.value); if (isExampleLoaded) setIsExampleLoaded(false); }}
             placeholder="Paste AI-generated code here..."
             className="glass-input font-mono text-xs min-h-[160px] resize-y leading-relaxed"
             spellCheck={false}
@@ -378,6 +364,83 @@ export function RunAutomationForm() {
             spellCheck={false}
           />
         </div>
+
+        {/* Pre-rendered example result panel */}
+        <AnimatePresence>
+          {showExampleResult && (
+            <motion.div
+              key="example-result"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="space-y-4 rounded-xl border border-orange-500/20 bg-orange-500/5 p-4"
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Eye className="w-3.5 h-3.5 text-orange-400" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Example Output — not a real run</span>
+              </div>
+
+              {/* Risk badge */}
+              <div className={`rounded-xl border p-4 space-y-2 ${RISK_META.RISKY.bg}`}>
+                <div className="flex items-center gap-2">
+                  {RISK_META.RISKY.icon}
+                  <span className={`font-bold text-sm ${RISK_META.RISKY.color}`}>{RISK_META.RISKY.label}</span>
+                </div>
+                <p className="text-xs text-white/80 leading-relaxed">{EXAMPLE_RESULT.summary}</p>
+                <span className="inline-block text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">max tier</span>
+              </div>
+
+              {/* Assumptions */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🔍 What the AI assumed</p>
+                {EXAMPLE_RESULT.assumptions!.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/15">
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase ${SEV_COLOR[a.severity]}`}>{a.severity}</span>
+                    <p className="text-xs text-white/75 leading-relaxed">{a.text}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Risks */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">💥 What could break</p>
+                {EXAMPLE_RESULT.risks!.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/15">
+                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase ${SEV_COLOR[r.severity]}`}>{r.severity}</span>
+                    <p className="text-xs text-white/75 leading-relaxed">{r.text}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Verify checklist */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">✅ What to verify</p>
+                <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 space-y-1.5">
+                  {EXAMPLE_RESULT.checks!.map((c, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="text-amber-500/60 shrink-0 mt-0.5">□</span>
+                      <p className="text-xs text-white/75 leading-relaxed">{c}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Suggestions */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🛠 Suggestions</p>
+                {EXAMPLE_RESULT.suggestions!.map((s, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-white/5 border border-white/10 space-y-1.5">
+                    <p className="text-xs font-bold text-white">{s.problem}</p>
+                    <p className="text-[10px] text-red-300/70 leading-snug"><span className="font-semibold text-red-400/90">Why it matters:</span> {s.why_it_matters}</p>
+                    <p className="text-[10px] text-emerald-300/70 leading-snug"><span className="font-semibold text-emerald-400/90">Fix:</span> {s.fix}</p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-[9px] text-muted-foreground/50 text-center pt-1">This is a pre-rendered preview. Run your own code to get a real analysis.</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* CTA area */}
         {freeTrialAvailable && (
