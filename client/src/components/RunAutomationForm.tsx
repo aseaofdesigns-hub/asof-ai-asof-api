@@ -443,7 +443,7 @@ async function downloadReport(result: CodeAnalysisResult, _code: string) {
   doc.save(`asof-report-${Date.now()}.pdf`);
 }
 
-export function RunAutomationForm() {
+export function RunAutomationForm({ onSaferCode }: { onSaferCode?: (original: string, safer: string) => void }) {
   const [code, setCode] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -527,6 +527,7 @@ export function RunAutomationForm() {
         const data = await res.json();
         setResult(data);
         setAnalysisId(id);
+        if (data.safer_code) onSaferCode?.(code, data.safer_code);
         toast({ title: "Analysis loaded", description: `Upgraded to ${data.tier?.toUpperCase() ?? 'new tier'}` });
       }
     } catch {}
@@ -622,6 +623,7 @@ export function RunAutomationForm() {
       if (data.analysisId) setAnalysisId(data.analysisId);
       if (asFree) setFreeTrialAvailable(false);
       if (paidSessionId && !asFree) consumeSession(paidSessionId);
+      if (data.safer_code) onSaferCode?.(code, data.safer_code);
       toast({ title: "Analysis complete", description: `Risk level: ${data.risk_level?.replace("_", " ")}` });
     } catch (err) {
       toast({ title: "Analysis failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
@@ -1071,28 +1073,11 @@ export function RunAutomationForm() {
                 </div>
               )}
 
-              {/* Side-by-side code diff — always visible */}
+              {/* Safer code lives in the right panel (Dashboard) */}
               {result.safer_code && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35 }}
-                  className="space-y-2 pt-1"
-                >
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                    🚦 Safer Suggested Code
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-1">Original AI Code</p>
-                      <pre className="text-[9px] font-mono leading-relaxed bg-white/5 border border-white/10 rounded-lg p-3 overflow-x-auto text-white/60 whitespace-pre-wrap break-all">{code}</pre>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 px-1">Safer Suggested Code</p>
-                      <pre className="text-[9px] font-mono leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 overflow-x-auto text-emerald-100/80 whitespace-pre-wrap break-all">{result.safer_code}</pre>
-                    </div>
-                  </div>
-                </motion.div>
+                <p className="text-[10px] text-emerald-400/70 flex items-center gap-1.5">
+                  🚦 Safer code rewrite ready — see panel on the right
+                </p>
               )}
 
               {/* Gated upgrade prompt — diff pricing with analysisId */}

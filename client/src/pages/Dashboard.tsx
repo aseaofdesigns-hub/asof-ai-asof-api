@@ -5,7 +5,7 @@ import { RunAutomationForm } from "@/components/RunAutomationForm";
 import { SignalsTable } from "@/components/SignalsTable";
 import { ConfidenceChart } from "@/components/ConfidenceChart";
 import { useCodeAnalyses } from "@/hooks/use-automation";
-import { Activity, Zap, Database, ShieldCheck, Lock, AlertTriangle, AlertOctagon, X } from "lucide-react";
+import { Activity, Zap, Database, ShieldCheck, Lock, AlertTriangle, AlertOctagon, X, Code2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type RiskLevel = "SAFE" | "NEEDS_REVIEW" | "RISKY" | "CRITICAL";
@@ -37,6 +37,7 @@ export default function Dashboard() {
   const { data: analyses } = useCodeAnalyses();
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
   const [riskFilter, setRiskFilter] = useState<RiskLevel | null>(null);
+  const [saferCodeData, setSaferCodeData] = useState<{ original: string; safer: string } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("stripe_session_id");
@@ -198,12 +199,12 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-            <motion.div variants={item} className="lg:col-span-1 h-full">
-              <RunAutomationForm />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <motion.div variants={item} className="lg:col-span-1">
+              <RunAutomationForm onSaferCode={(orig, safer) => setSaferCodeData({ original: orig, safer })} />
             </motion.div>
 
-            <motion.div variants={item} className="lg:col-span-2 flex flex-col gap-6 h-full">
+            <motion.div variants={item} className="lg:col-span-2 flex flex-col gap-6">
               <div className="h-[240px] glass-card rounded-2xl p-6 border border-white/5 relative overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -216,7 +217,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="flex-1 glass-card rounded-2xl p-6 border border-white/5 overflow-hidden flex flex-col">
+              <div className="glass-card rounded-2xl p-6 border border-white/5 overflow-hidden flex flex-col min-h-[220px]">
                 <div className="flex items-center justify-between mb-4 shrink-0">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <Database className="w-4 h-4 text-primary" />
@@ -238,10 +239,49 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
+                <div className="overflow-auto pr-2 custom-scrollbar max-h-[320px]">
                   <SignalsTable riskFilter={riskFilter} />
                 </div>
               </div>
+
+              {/* 🚦 Safer Suggested Code — appears below Recent Analyses after a Max run */}
+              <AnimatePresence>
+                {saferCodeData && (
+                  <motion.div
+                    key="safer-code-panel"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 16 }}
+                    transition={{ duration: 0.4 }}
+                    className="glass-card rounded-2xl p-6 border border-emerald-500/20 flex flex-col gap-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                        <Code2 className="w-4 h-4" />
+                        🚦 Safer Suggested Code
+                      </h3>
+                      <button
+                        data-testid="button-close-safer-code"
+                        onClick={() => setSaferCodeData(null)}
+                        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
+                      >
+                        <X className="w-3 h-3" />
+                        Dismiss
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Original AI Code</p>
+                        <pre className="text-[9px] font-mono leading-relaxed bg-white/5 border border-white/10 rounded-xl p-4 overflow-auto text-white/60 whitespace-pre-wrap break-all max-h-[400px] custom-scrollbar">{saferCodeData.original}</pre>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-400">Safer Suggested Code</p>
+                        <pre className="text-[9px] font-mono leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 overflow-auto text-emerald-100/80 whitespace-pre-wrap break-all max-h-[400px] custom-scrollbar">{saferCodeData.safer}</pre>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </div>
         </motion.div>
