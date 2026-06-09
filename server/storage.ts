@@ -5,7 +5,7 @@ import { desc, eq } from "drizzle-orm";
 export interface IStorage {
   createSignal(signal: InsertSignal): Promise<Signal>;
   getSignals(): Promise<Signal[]>;
-  createPayment(payment: { stripeSessionId: string, amount: number, tier: string }): Promise<Payment>;
+  createPayment(payment: { stripeSessionId: string, amount: number, tier: string, analysisId?: number }): Promise<Payment>;
   getPaymentBySessionId(sessionId: string): Promise<Payment | undefined>;
   updatePaymentStatus(sessionId: string, status: string): Promise<Payment>;
   markSessionConsumed(sessionId: string): Promise<Payment>;
@@ -13,6 +13,8 @@ export interface IStorage {
   markFreeTrialUsed(fingerprint: string): Promise<void>;
   createCodeAnalysis(analysis: InsertCodeAnalysis): Promise<CodeAnalysis>;
   getCodeAnalyses(filter: { fingerprint?: string; sessionId?: string }): Promise<CodeAnalysis[]>;
+  getAnalysisById(id: number): Promise<CodeAnalysis | undefined>;
+  upgradeAnalysisTier(id: number, tier: string): Promise<CodeAnalysis>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -25,12 +27,13 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(signals).orderBy(desc(signals.timestamp));
   }
 
-  async createPayment(data: { stripeSessionId: string, amount: number, tier: string }): Promise<Payment> {
+  async createPayment(data: { stripeSessionId: string, amount: number, tier: string, analysisId?: number }): Promise<Payment> {
     const [payment] = await db.insert(payments).values({
       stripeSessionId: data.stripeSessionId,
       amount: data.amount,
       tier: data.tier,
-      status: "pending"
+      status: "pending",
+      analysisId: data.analysisId ?? null,
     }).returning();
     return payment;
   }
@@ -89,6 +92,19 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(codeAnalyses)
       .where(eq(codeAnalyses.sessionId, sessionId!))
       .orderBy(desc(codeAnalyses.timestamp));
+  }
+
+  async getAnalysisById(id: number): Promise<CodeAnalysis | undefined> {
+    const [record] = await db.select().from(codeAnalyses).where(eq(codeAnalyses.id, id));
+    return record;
+  }
+
+  async upgradeAnalysisTier(id: number, tier: string): Promise<CodeAnalysis> {
+    const [record] = await db.update(codeAnalyses)
+      .set({ tier })
+      .where(eq(codeAnalyses.id, id))
+      .returning();
+    return record;
   }
 }
 

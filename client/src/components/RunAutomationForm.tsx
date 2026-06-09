@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, ChevronDown, ChevronUp, Sparkles, Eye } from "lucide-react";
+import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, ChevronDown, ChevronUp, Sparkles, Eye, ArrowUpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import type { CodeAnalysisResult } from "@shared/routes";
@@ -76,12 +76,13 @@ const EXAMPLE_RESULT: CodeAnalysisResult = {
     {
       problem: "Missing Stripe idempotency key",
       why_it_matters: "Network retries on a timeout will create duplicate real charges on the customer's card.",
-      fix: "Add `idempotencyKey: \`order-\${userId}-\${cartHash}\`` to every `stripe.charges.create` call.",
+      fix: "Add `idempotencyKey: `order-${userId}-${cartHash}`` to every `stripe.charges.create` call.",
     },
   ],
   tier: "max",
   gated: false,
 };
+
 function getFingerprint(): string {
   let fp = localStorage.getItem("asof_fp");
   if (!fp) {
@@ -89,6 +90,24 @@ function getFingerprint(): string {
     localStorage.setItem("asof_fp", fp);
   }
   return fp;
+}
+
+const TIER_CENTS: Record<string, number> = { free: 0, lite: 50, pro: 100, max: 250 };
+const TIER_ORDER: Record<string, number> = { free: 0, lite: 1, pro: 2, max: 3 };
+
+function getUpgradeOptions(currentTier: string, minTier: string) {
+  const all = [
+    { tier: 'lite' as const, name: 'Lite', description: 'Full assumptions + what could break' },
+    { tier: 'pro' as const, name: 'Pro', description: 'Verify checklist + suggestion cards' },
+    { tier: 'max' as const, name: 'Max', description: 'Safer code rewrite side-by-side' },
+  ];
+  return all
+    .filter(t => TIER_ORDER[t.tier] >= TIER_ORDER[minTier])
+    .map(t => {
+      const diffCents = TIER_CENTS[t.tier] - (TIER_CENTS[currentTier] ?? 0);
+      return { ...t, diffCents, diffLabel: diffCents > 0 ? `+$${(diffCents / 100).toFixed(2)}` : `$${(TIER_CENTS[t.tier] / 100).toFixed(2)}` };
+    })
+    .filter(t => t.diffCents > 0);
 }
 
 const RISK_META = {
@@ -191,12 +210,51 @@ export function RunAutomationForm() {
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<CodeAnalysisResult | null>(null);
   const [isDemo, setIsDemo] = useState(false);
-  const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<Array<{ id: string; tier: string }>>([]);
+  const [analysisId, setAnalysisId] = useState<number | null>(null);
   const [freeTrialAvailable, setFreeTrialAvailable] = useState<boolean | null>(null);
   const [showSaferCode, setShowSaferCode] = useState(false);
   const [showExampleResult, setShowExampleResult] = useState(false);
   const [isExampleLoaded, setIsExampleLoaded] = useState(false);
   const { toast } = useToast();
+
+  // Derived: first queued session (backward compat with existing render logic)
+  const paidSessionId = sessions[0]?.id ?? null;
+
+  function loadSessions() {
+    try {
+      const raw = localStorage.getItem("asof_sessions");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) { setSessions(parsed); return; }
+      }
+      const old = localStorage.getItem("stripe_session_id");
+      if (old) setSessions([{ id: old, tier: localStorage.getItem("purchased_tier") ?? "lite" }]);
+    } catch { setSessions([]); }
+  }
+
+  function consumeSession(id: string) {
+    setSessions(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      localStorage.setItem("asof_sessions", JSON.stringify(updated));
+      if (updated.length > 0) localStorage.setItem("stripe_session_id", updated[0].id);
+      else { localStorage.removeItem("stripe_session_id"); localStorage.removeItem("purchased_tier"); }
+      return updated;
+    });
+  }
+
+  async function fetchUpgradedAnalysis(id: number) {
+    const fp = getFingerprint();
+    try {
+      const res = await fetch(`/api/analysis/${id}?fingerprint=${fp}`);
+      if (res.ok) {
+        const data = await res.json();
+        setResult(data);
+        setAnalysisId(id);
+        toast({ title: "Analysis loaded", description: `Upgraded to ${data.tier?.toUpperCase() ?? 'new tier'}` });
+      }
+    } catch {}
+  }
 
   const loadExample = () => {
     setCode(EXAMPLE_CODE);
@@ -206,30 +264,49 @@ export function RunAutomationForm() {
     setShowExampleResult(false);
   };
 
-  const showMockResult = () => {
-    setShowExampleResult(v => !v);
-  };
+  const showMockResult = () => { setShowExampleResult(v => !v); };
 
   useEffect(() => {
-    const saved = localStorage.getItem("stripe_session_id");
-    if (saved) setPaidSessionId(saved);
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "stripe_session_id" && e.newValue) setPaidSessionId(e.newValue);
-    };
-    window.addEventListener("storage", onStorage);
+    loadSessions();
     fetch(`/api/free-trial-status?fingerprint=${getFingerprint()}`)
       .then(r => r.json())
       .then(d => setFreeTrialAvailable(d.available))
       .catch(() => setFreeTrialAvailable(false));
+
+    // Check for pending upgrade (returned from Stripe after an upgrade payment)
+    const raw = localStorage.getItem("pending_upgrade");
+    if (raw) {
+      try {
+        const { analysisId: pendingId } = JSON.parse(raw);
+        localStorage.removeItem("pending_upgrade");
+        if (pendingId) fetchUpgradedAnalysis(pendingId);
+      } catch { localStorage.removeItem("pending_upgrade"); }
+    }
+
+    // Listen for new sessions added in other tabs (e.g. verify page)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "asof_sessions") loadSessions();
+      if (e.key === "stripe_session_id" && e.newValue) loadSessions();
+    };
+    window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const initiatePayment = async (tier: 'lite' | 'pro' | 'max') => {
+  const initiatePayment = async (
+    tier: 'lite' | 'pro' | 'max',
+    upgradeAnalysisId?: number,
+    fromTier?: string,
+  ) => {
     try {
+      const body: Record<string, unknown> = { tier };
+      if (upgradeAnalysisId && fromTier) {
+        body.analysisId = upgradeAnalysisId;
+        body.fromTier = fromTier;
+      }
       const res = await fetch('/api/create-payment', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error((await res.json()).message || "Payment failed");
       const { url } = await res.json();
@@ -247,6 +324,7 @@ export function RunAutomationForm() {
     }
     setIsRunning(true);
     setResult(null);
+    setAnalysisId(null);
     setIsDemo(false);
     setShowSaferCode(false);
     try {
@@ -265,11 +343,9 @@ export function RunAutomationForm() {
         throw new Error(data.message || "Analysis failed");
       }
       setResult(data);
+      if (data.analysisId) setAnalysisId(data.analysisId);
       if (asFree) setFreeTrialAvailable(false);
-      if (paidSessionId && !asFree) {
-        localStorage.removeItem("stripe_session_id");
-        setPaidSessionId(null);
-      }
+      if (paidSessionId && !asFree) consumeSession(paidSessionId);
       toast({ title: "Analysis complete", description: `Risk level: ${data.risk_level?.replace("_", " ")}` });
     } catch (err) {
       toast({ title: "Analysis failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
@@ -284,6 +360,15 @@ export function RunAutomationForm() {
     { id: 'lite' as const, name: 'ASOF Lite', price: '$0.50', description: 'Risk level + all assumptions + what could break', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />, unlocks: ['Full assumption list', 'What could break'] },
     { id: 'pro' as const, name: 'ASOF Pro', price: '$1.00', description: 'Everything in Lite + verify checklist + suggestion cards', icon: <Zap className="w-4 h-4 text-blue-400" />, unlocks: ['Verify checklist', 'Detailed suggestion cards'] },
     { id: 'max' as const, name: 'ASOF Max', price: '$2.50', description: 'Full analysis + safer code rewrite side-by-side', icon: <ShieldCheck className="w-4 h-4 text-purple-400" />, unlocks: ['Side-by-side safer code', 'Full rewrite'] },
+  ];
+
+  const featureTable = [
+    { label: "Verdict (risk level)", lite: true, pro: true, max: true },
+    { label: "Assumptions", lite: true, pro: true, max: true },
+    { label: "What Could Break", lite: true, pro: true, max: true },
+    { label: "Verify Checklist", lite: false, pro: true, max: true },
+    { label: "Suggestion Cards", lite: false, pro: true, max: true },
+    { label: "Safer Code Rewrite", lite: false, pro: false, max: true },
   ];
 
   return (
@@ -380,8 +465,6 @@ export function RunAutomationForm() {
                 <Eye className="w-3.5 h-3.5 text-orange-400" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Example Output — not a real run</span>
               </div>
-
-              {/* Risk badge */}
               <div className={`rounded-xl border p-4 space-y-2 ${RISK_META.RISKY.bg}`}>
                 <div className="flex items-center gap-2">
                   {RISK_META.RISKY.icon}
@@ -390,8 +473,6 @@ export function RunAutomationForm() {
                 <p className="text-xs text-white/80 leading-relaxed">{EXAMPLE_RESULT.summary}</p>
                 <span className="inline-block text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">max tier</span>
               </div>
-
-              {/* Assumptions */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🔍 What the AI assumed</p>
                 {EXAMPLE_RESULT.assumptions!.map((a, i) => (
@@ -401,8 +482,6 @@ export function RunAutomationForm() {
                   </div>
                 ))}
               </div>
-
-              {/* Risks */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">💥 What could break</p>
                 {EXAMPLE_RESULT.risks!.map((r, i) => (
@@ -412,8 +491,6 @@ export function RunAutomationForm() {
                   </div>
                 ))}
               </div>
-
-              {/* Verify checklist */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">✅ What to verify</p>
                 <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 space-y-1.5">
@@ -425,8 +502,6 @@ export function RunAutomationForm() {
                   ))}
                 </div>
               </div>
-
-              {/* Suggestions */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🛠 Suggestions</p>
                 {EXAMPLE_RESULT.suggestions!.map((s, i) => (
@@ -437,7 +512,6 @@ export function RunAutomationForm() {
                   </div>
                 ))}
               </div>
-
               <p className="text-[9px] text-muted-foreground/50 text-center pt-1">This is a pre-rendered preview. Run your own code to get a real analysis.</p>
             </motion.div>
           )}
@@ -456,21 +530,26 @@ export function RunAutomationForm() {
         )}
 
         {paidSessionId && (
-          <Button
-            data-testid="button-analyze"
-            onClick={() => runAnalysis(false)}
-            disabled={isRunning || !code.trim()}
-            className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
-          >
-            {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
-          </Button>
+          <div className="space-y-2">
+            <Button
+              data-testid="button-analyze"
+              onClick={() => runAnalysis(false)}
+              disabled={isRunning || !code.trim()}
+              className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
+            >
+              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
+            </Button>
+            {sessions.length > 1 && (
+              <p className="text-center text-[10px] text-emerald-400/80 font-medium">
+                {sessions.length} credits queued — used one at a time
+              </p>
+            )}
+          </div>
         )}
 
         {!freeTrialAvailable && !paidSessionId && freeTrialAvailable !== null && (
           <div className="space-y-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Select Pricing Tier</p>
-
-            {/* Feature comparison table */}
             <div className="rounded-xl border border-white/10 overflow-hidden text-[9px]">
               <div className="grid grid-cols-4 bg-white/5 border-b border-white/10">
                 <div className="p-2 text-muted-foreground font-semibold uppercase tracking-wider">Feature</div>
@@ -478,27 +557,17 @@ export function RunAutomationForm() {
                 <div className="p-2 text-center text-blue-400 font-bold">Pro<br/><span className="text-white/60 font-normal normal-case tracking-normal">$1.00</span></div>
                 <div className="p-2 text-center text-purple-400 font-bold">Max<br/><span className="text-white/60 font-normal normal-case tracking-normal">$2.50</span></div>
               </div>
-              {[
-                { label: "Verdict (risk level)", lite: true, pro: true, max: true },
-                { label: "Assumptions", lite: true, pro: true, max: true },
-                { label: "What Could Break", lite: true, pro: true, max: true },
-                { label: "Verify Checklist", lite: false, pro: true, max: true },
-                { label: "Suggestion Cards", lite: false, pro: true, max: true },
-                { label: "Safer Code Rewrite", lite: false, pro: false, max: true },
-              ].map((row, i) => (
+              {featureTable.map((row, i) => (
                 <div key={i} className={`grid grid-cols-4 border-b border-white/5 last:border-0 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
                   <div className="p-2 text-muted-foreground">{row.label}</div>
                   {[row.lite, row.pro, row.max].map((has, j) => (
                     <div key={j} className="p-2 flex justify-center items-center">
-                      {has
-                        ? <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        : <Lock className="w-3 h-3 text-white/20" />}
+                      {has ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Lock className="w-3 h-3 text-white/20" />}
                     </div>
                   ))}
                 </div>
               ))}
             </div>
-
             {tiers.map(tier => (
               <button
                 key={tier.id}
@@ -516,13 +585,8 @@ export function RunAutomationForm() {
                 <span className="text-xs font-bold text-white">{tier.price}</span>
               </button>
             ))}
-
             <div className="text-center pt-1">
-              <Link
-                data-testid="link-full-pricing"
-                href="/pricing"
-                className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
-              >
+              <Link data-testid="link-full-pricing" href="/pricing" className="text-[10px] text-muted-foreground hover:text-primary transition-colors">
                 View full pricing comparison →
               </Link>
             </div>
@@ -536,8 +600,6 @@ export function RunAutomationForm() {
               <span className="text-[9px] text-muted-foreground uppercase tracking-widest">or pay for deeper analysis</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
-
-            {/* Feature comparison table */}
             <div className="rounded-xl border border-white/10 overflow-hidden text-[9px]">
               <div className="grid grid-cols-4 bg-white/5 border-b border-white/10">
                 <div className="p-2 text-muted-foreground font-semibold uppercase tracking-wider">Feature</div>
@@ -545,27 +607,17 @@ export function RunAutomationForm() {
                 <div className="p-2 text-center text-blue-400 font-bold">Pro<br/><span className="text-white/60 font-normal normal-case tracking-normal">$1.00</span></div>
                 <div className="p-2 text-center text-purple-400 font-bold">Max<br/><span className="text-white/60 font-normal normal-case tracking-normal">$2.50</span></div>
               </div>
-              {[
-                { label: "Verdict (risk level)", lite: true, pro: true, max: true },
-                { label: "Assumptions", lite: true, pro: true, max: true },
-                { label: "What Could Break", lite: true, pro: true, max: true },
-                { label: "Verify Checklist", lite: false, pro: true, max: true },
-                { label: "Suggestion Cards", lite: false, pro: true, max: true },
-                { label: "Safer Code Rewrite", lite: false, pro: false, max: true },
-              ].map((row, i) => (
+              {featureTable.map((row, i) => (
                 <div key={i} className={`grid grid-cols-4 border-b border-white/5 last:border-0 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
                   <div className="p-2 text-muted-foreground">{row.label}</div>
                   {[row.lite, row.pro, row.max].map((has, j) => (
                     <div key={j} className="p-2 flex justify-center items-center">
-                      {has
-                        ? <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        : <Lock className="w-3 h-3 text-white/20" />}
+                      {has ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Lock className="w-3 h-3 text-white/20" />}
                     </div>
                   ))}
                 </div>
               ))}
             </div>
-
             {tiers.map(tier => (
               <button
                 key={tier.id}
@@ -595,7 +647,6 @@ export function RunAutomationForm() {
               exit={{ opacity: 0 }}
               className="space-y-4 mt-2"
             >
-              {/* Demo banner */}
               {isDemo && (
                 <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-[10px]">
                   <span className="text-primary font-bold uppercase tracking-wider">✨ Example analysis — paste your own code above to run a real check</span>
@@ -717,32 +768,56 @@ export function RunAutomationForm() {
                 </div>
               )}
 
-              {/* Gated upgrade prompt */}
-              {result.gated && (
+              {/* Gated upgrade prompt — diff pricing with analysisId */}
+              {result.gated && result.gated_tier && (
                 <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-3">
                   <div className="flex items-center gap-2">
                     <Lock className="w-4 h-4 text-purple-400" />
                     <p className="text-xs font-bold text-purple-300">
-                      Upgrade to {result.gated_tier?.toUpperCase()} for{' '}
-                      {result.gated_tier === 'lite' ? 'the full assumption list and what could break' :
-                       result.gated_tier === 'pro' ? 'the verify checklist and detailed suggestion cards' :
-                       'the safer code rewrite side-by-side'}
+                      {analysisId ? "Upgrade this analysis — pay only the difference" : `Unlock ${result.gated_tier.toUpperCase()} tier`}
                     </p>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {tiers.filter(t => {
-                      const order = { lite: 0, pro: 1, max: 2 };
-                      return order[t.id] >= order[result.gated_tier as keyof typeof order];
-                    }).map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => initiatePayment(t.id)}
-                        className="text-[10px] font-bold px-3 py-1.5 rounded border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all"
-                      >
-                        {t.name} — {t.price}
-                      </button>
-                    ))}
-                  </div>
+
+                  {/* Upgrade-in-place (diff pricing) — only when we have an analysisId */}
+                  {analysisId && (
+                    <div className="space-y-2">
+                      {getUpgradeOptions(result.tier ?? 'free', result.gated_tier).map(opt => (
+                        <button
+                          key={opt.tier}
+                          data-testid={`button-upgrade-${opt.tier}`}
+                          onClick={() => initiatePayment(opt.tier, analysisId, result.tier ?? 'free')}
+                          className="flex items-center justify-between w-full text-[10px] font-bold px-3 py-2.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ArrowUpCircle className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            <div className="text-left">
+                              <p className="font-bold">{opt.name} — {opt.description}</p>
+                            </div>
+                          </div>
+                          <span className="font-mono text-purple-300 shrink-0 ml-3">{opt.diffLabel}</span>
+                        </button>
+                      ))}
+                      <p className="text-[9px] text-purple-400/50 pl-1">Same analysis, instantly expanded — no re-run needed.</p>
+                    </div>
+                  )}
+
+                  {/* Fallback: fresh purchase (no analysisId or free) */}
+                  {!analysisId && (
+                    <div className="flex gap-2 flex-wrap">
+                      {tiers.filter(t => {
+                        const order = { lite: 0, pro: 1, max: 2 };
+                        return order[t.id] >= order[result.gated_tier as keyof typeof order];
+                      }).map(t => (
+                        <button
+                          key={t.id}
+                          onClick={() => initiatePayment(t.id)}
+                          className="text-[10px] font-bold px-3 py-1.5 rounded border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all"
+                        >
+                          {t.name} — {t.price}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>

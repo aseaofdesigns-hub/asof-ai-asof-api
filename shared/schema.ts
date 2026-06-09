@@ -10,6 +10,7 @@ export const codeAnalyses = pgTable("code_analyses", {
   tier: text("tier").notNull(),
   fingerprint: text("fingerprint"),
   sessionId: text("session_id"),
+  fullData: jsonb("full_data"),
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
@@ -33,10 +34,11 @@ export const signals = pgTable("signals", {
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
   stripeSessionId: text("stripe_session_id").notNull().unique(),
-  status: text("status").notNull().default("pending"), // pending, paid
+  status: text("status").notNull().default("pending"),
   amount: integer("amount").notNull(),
-  tier: text("tier").notNull().default("lite"), // lite, pro, max
-  consumed: boolean("consumed").notNull().default(false), // one-time use protection
+  tier: text("tier").notNull().default("lite"),
+  consumed: boolean("consumed").notNull().default(false),
+  analysisId: integer("analysis_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -47,9 +49,9 @@ export const freeTrials = pgTable("free_trials", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertSignalSchema = createInsertSchema(signals).omit({ 
+export const insertSignalSchema = createInsertSchema(signals).omit({
   id: true,
-  timestamp: true 
+  timestamp: true
 });
 
 export type Signal = typeof signals.$inferSelect;
@@ -59,5 +61,5 @@ export type Payment = typeof payments.$inferSelect;
 export const runAutomationSchema = z.object({
   agent_id: z.string(),
   payload: z.record(z.any()),
-  sessionId: z.string(), // Required to verify payment before run
+  sessionId: z.string(),
 });

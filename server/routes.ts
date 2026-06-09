@@ -752,10 +752,49 @@ export async function registerRoutes(
   app.post(api.payments.create.path, async (req, res) => {
     try {
       const stripe = await getUncachableStripeClient();
-      const { tier } = api.payments.create.input.parse(req.body);
+      const { tier, analysisId, fromTier } = api.payments.create.input.parse(req.body);
 
-      
-      // Live Stripe price IDs - fallback if database sync hasn't happened
+      const TIER_CENTS: Record<string, number> = { free: 0, lite: 50, pro: 100, max: 250 };
+      const TIER_NAMES: Record<string, string> = { free: 'Free', lite: 'Lite', pro: 'Pro', max: 'Max' };
+
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host || req.headers.origin?.replace(/^https?:\/\//, '');
+      const baseUrl = req.headers.origin || `${protocol}://${host}`;
+
+      // ── Upgrade payment (diff pricing) ────────────────────────────────────
+      if (analysisId && fromTier && fromTier !== tier) {
+        const diffCents = TIER_CENTS[tier] - (TIER_CENTS[fromTier] ?? 0);
+        if (diffCents <= 0) {
+          return res.status(400).json({ message: "Invalid upgrade path — target tier must be higher" });
+        }
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: [{
+            price_data: {
+              currency: 'usd',
+              unit_amount: diffCents,
+              product_data: {
+                name: `ASOF ${TIER_NAMES[tier]} Upgrade`,
+                description: `Upgrade from ${TIER_NAMES[fromTier]} → ${TIER_NAMES[tier]} — pay only the difference`,
+              },
+            },
+            quantity: 1,
+          }],
+          mode: 'payment',
+          success_url: `${baseUrl}/verify?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${baseUrl}/`,
+          metadata: { tier, analysisId: String(analysisId), fromTier },
+        });
+        await storage.createPayment({
+          stripeSessionId: session.id,
+          amount: diffCents,
+          tier,
+          analysisId,
+        });
+        return res.json({ url: session.url });
+      }
+
+      // ── Fresh purchase ─────────────────────────────────────────────────────
       const livePriceIds: Record<string, { price_id: string; unit_amount: number }> = {
         lite: { price_id: 'price_1SnuQmAGtLlBc3WPf2LwcpRH', unit_amount: 50 },
         pro: { price_id: 'price_1SnuQnAGtLlBc3WP0kv4feWH', unit_amount: 100 },
@@ -776,62 +815,42 @@ export async function registerRoutes(
               ORDER BY p.id DESC
               LIMIT 1`
         );
-
         if (result.rows.length > 0) {
           const row = result.rows[0] as any;
           price_id = row.price_id;
           unit_amount = row.unit_amount;
         } else {
-          // Use fallback
           const fallback = livePriceIds[tier];
-          if (!fallback) {
-            return res.status(404).json({ message: `No price found for tier: ${tier}` });
-          }
+          if (!fallback) return res.status(404).json({ message: `No price found for tier: ${tier}` });
           price_id = fallback.price_id;
           unit_amount = fallback.unit_amount;
-          console.log(`Using fallback price for tier ${tier}: ${price_id}`);
         }
       } catch (dbErr) {
-        // Database query failed, use fallback
-        console.log('Database query failed, using fallback prices:', dbErr);
         const fallback = livePriceIds[tier];
-        if (!fallback) {
-          return res.status(404).json({ message: `No price found for tier: ${tier}` });
-        }
+        if (!fallback) return res.status(404).json({ message: `No price found for tier: ${tier}` });
         price_id = fallback.price_id;
         unit_amount = fallback.unit_amount;
       }
 
-      const protocol = req.headers['x-forwarded-proto'] || 'https';
-      const host = req.headers.host || req.headers.origin?.replace(/^https?:\/\//, '');
-      const baseUrl = req.headers.origin || `${protocol}://${host}`;
-
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        line_items: [{
-          price: price_id,
-          quantity: 1,
-        }],
+        line_items: [{ price: price_id, quantity: 1 }],
         mode: 'payment',
         success_url: `${baseUrl}/verify?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/`,
-        metadata: {
-          tier: tier
-        }
+        metadata: { tier },
       });
 
       await storage.createPayment({
         stripeSessionId: session.id,
         amount: unit_amount as number,
-        tier: tier
+        tier,
       });
 
       res.json({ url: session.url });
     } catch (err) {
       console.error('Payment creation error:', err);
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid tier" });
-      }
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Invalid tier" });
       res.status(500).json({ message: "Failed to create checkout session" });
     }
   });
@@ -846,10 +865,15 @@ export async function registerRoutes(
 
       if (session.payment_status === 'paid') {
         await storage.updatePaymentStatus(sessionId, 'paid');
+        // If this is an upgrade payment, bump the analysis tier in place
+        if (payment?.analysisId) {
+          await storage.upgradeAnalysisTier(payment.analysisId, payment.tier);
+        }
         return res.json({
           status: 'paid',
           tier: payment?.tier ?? null,
           amount: payment?.amount ?? null,
+          analysisId: payment?.analysisId ?? null,
         });
       }
       res.json({ status: session.payment_status });
@@ -1180,17 +1204,23 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
         await db.insert(freeTrials).values({ fingerprint });
       }
 
-      // Save analysis to database (store ownership for scoped retrieval)
+      // Save analysis to database (store ownership + full AI response for upgrades)
       const riskLevel = analysis.risk_level ?? 'NEEDS_REVIEW';
       const summary = analysis.summary ?? '';
-      await storage.createCodeAnalysis({
+      const savedAnalysis = await storage.createCodeAnalysis({
         codeSnippet: code.slice(0, 500),
         riskLevel,
         summary,
         tier,
         fingerprint: fingerprint ?? null,
         sessionId: sessionId ?? null,
+        fullData: analysis,
       });
+
+      // Consume the payment session so it cannot be reused
+      if (sessionId && tier !== 'free') {
+        await storage.markSessionConsumed(sessionId).catch(() => {});
+      }
 
       // Gate results by tier
       const base = {
@@ -1198,6 +1228,7 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
         summary: analysis.summary ?? '',
         assumptions: analysis.assumptions ?? [],
         tier,
+        analysisId: savedAnalysis.id,
       };
 
       if (tier === 'free') {
@@ -1238,6 +1269,51 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
     } catch (err: any) {
       console.error("analyze-code error:", err);
       res.status(500).json({ message: err?.message ?? "Analysis failed." });
+    }
+  });
+
+  // ── GET /api/analysis/:id — fetch a single analysis by ID (for upgrades) ──
+  app.get('/api/analysis/:id', async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid analysis ID" });
+    const fingerprint = req.query.fingerprint as string | undefined;
+    const sessionId = req.query.sessionId as string | undefined;
+
+    try {
+      const record = await storage.getAnalysisById(id);
+      if (!record) return res.status(404).json({ message: "Analysis not found" });
+
+      // Ownership check — must match fingerprint or sessionId
+      const ownsViaTierprint = fingerprint && record.fingerprint === fingerprint;
+      const ownsViaSession = sessionId && record.sessionId === sessionId;
+      if (!ownsViaTierprint && !ownsViaSession) {
+        return res.status(403).json({ message: "Not authorized to view this analysis" });
+      }
+
+      const fullData = record.fullData as any;
+      if (!fullData) return res.status(422).json({ message: "Full data unavailable — this analysis was created before upgrade support was added" });
+
+      const tier = record.tier;
+      const base = {
+        risk_level: fullData.risk_level ?? record.riskLevel,
+        summary: fullData.summary ?? record.summary,
+        assumptions: fullData.assumptions ?? [],
+        tier,
+        analysisId: record.id,
+      };
+
+      if (tier === 'free') {
+        return res.json({ ...base, assumptions: (fullData.assumptions ?? []).slice(0, 2), gated: true, gated_tier: 'lite' });
+      }
+      if (tier === 'lite') {
+        return res.json({ ...base, risks: fullData.risks ?? [], gated: true, gated_tier: 'pro' });
+      }
+      if (tier === 'pro') {
+        return res.json({ ...base, risks: fullData.risks ?? [], checks: fullData.checks ?? [], suggestions: fullData.suggestions ?? [], gated: true, gated_tier: 'max' });
+      }
+      return res.json({ ...base, risks: fullData.risks ?? [], checks: fullData.checks ?? [], safer_code: fullData.safer_code ?? '', suggestions: fullData.suggestions ?? [], gated: false });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Failed to fetch analysis" });
     }
   });
 

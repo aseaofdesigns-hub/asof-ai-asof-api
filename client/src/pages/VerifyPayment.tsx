@@ -1,11 +1,24 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, ArrowUpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const TIER_LABELS: Record<string, string> = {
+  lite: "Lite ($0.50)",
+  pro: "Pro ($1.00)",
+  max: "Max ($2.50)",
+};
+
+type VerifyResponse = {
+  status: string;
+  tier: string | null;
+  amount: number | null;
+  analysisId?: number | null;
+};
 
 export default function VerifyPayment() {
   const [, setLocation] = useLocation();
@@ -13,28 +26,39 @@ export default function VerifyPayment() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
 
-  const tierLabels: Record<string, { label: string; price: string }> = {
-    lite: { label: "Lite", price: "$0.50" },
-    pro: { label: "Pro", price: "$1.00" },
-    max: { label: "Max", price: "$2.50" },
-  };
-
-  const { data, isLoading, error } = useQuery<{ status: string; tier: string | null; amount: number | null }>({
+  const { data, isLoading, error } = useQuery<VerifyResponse>({
     queryKey: [buildUrl(api.payments.verify.path, { sessionId: sessionId || "" })],
     enabled: !!sessionId,
     retry: 3,
   });
 
+  const isUpgrade = !!(data?.analysisId);
+
   useEffect(() => {
     if (data?.status === "paid") {
-      localStorage.setItem("stripe_session_id", sessionId!);
-      if (data.tier) {
-        localStorage.setItem("purchased_tier", data.tier);
+      if (data.analysisId) {
+        localStorage.setItem("pending_upgrade", JSON.stringify({
+          analysisId: data.analysisId,
+          tier: data.tier,
+        }));
+        toast({
+          title: "Analysis Upgraded!",
+          description: `Upgraded to ${data.tier ? TIER_LABELS[data.tier] ?? data.tier : "next tier"}.`,
+        });
+      } else {
+        try {
+          const raw = localStorage.getItem("asof_sessions");
+          const sessions: Array<{ id: string; tier: string }> = raw ? JSON.parse(raw) : [];
+          sessions.push({ id: sessionId!, tier: data.tier ?? "lite" });
+          localStorage.setItem("asof_sessions", JSON.stringify(sessions));
+          localStorage.setItem("stripe_session_id", sessions[0].id);
+          if (data.tier) localStorage.setItem("purchased_tier", data.tier);
+        } catch {}
+        toast({
+          title: "Payment Successful",
+          description: "You can now run your analysis.",
+        });
       }
-      toast({
-        title: "Payment Successful",
-        description: "You can now run your automation.",
-      });
     }
   }, [data, sessionId, toast]);
 
@@ -68,17 +92,27 @@ export default function VerifyPayment() {
               </>
             ) : data?.status === "paid" ? (
               <>
-                <CheckCircle2 className="w-12 h-12 text-green-500" />
-                <h2 className="text-xl font-semibold">Payment Confirmed!</h2>
+                {isUpgrade
+                  ? <ArrowUpCircle className="w-12 h-12 text-purple-400" />
+                  : <CheckCircle2 className="w-12 h-12 text-green-500" />}
+                <h2 className="text-xl font-semibold">
+                  {isUpgrade ? "Analysis Upgraded!" : "Payment Confirmed!"}
+                </h2>
                 <p className="text-muted-foreground">
-                  {data?.tier && tierLabels[data.tier]
-                    ? `Your ${tierLabels[data.tier].price} ${tierLabels[data.tier].label} plan payment was successful.`
-                    : data?.amount
+                  {isUpgrade
+                    ? `Your analysis has been upgraded to ${data.tier ? TIER_LABELS[data.tier] ?? data.tier : "the next tier"}.`
+                    : data.tier && TIER_LABELS[data.tier]
+                    ? `Your ${TIER_LABELS[data.tier]} plan is now active.`
+                    : data.amount
                     ? `Your $${(data.amount / 100).toFixed(2)} payment was successful.`
                     : "Your payment was successful."}
                 </p>
-                <Button className="w-full" onClick={() => setLocation("/")}>
-                  Run Automation Now
+                <Button
+                  data-testid="button-go-home"
+                  className="w-full"
+                  onClick={() => setLocation("/")}
+                >
+                  {isUpgrade ? "View Upgraded Analysis" : "Run Analysis Now"}
                 </Button>
               </>
             ) : (

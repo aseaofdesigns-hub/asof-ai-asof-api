@@ -29,6 +29,7 @@ export const codeAnalysisResultSchema = z.object({
   gated: z.boolean().optional(),
   gated_tier: z.string().optional(),
   tier: z.string().optional(),
+  analysisId: z.number().optional(),
 });
 
 export type CodeAnalysisResult = z.infer<typeof codeAnalysisResultSchema>;
@@ -39,7 +40,9 @@ export const api = {
       method: 'POST' as const,
       path: '/api/create-payment',
       input: z.object({
-        tier: z.enum(['lite', 'pro', 'max'])
+        tier: z.enum(['lite', 'pro', 'max']),
+        analysisId: z.number().optional(),
+        fromTier: z.enum(['free', 'lite', 'pro']).optional(),
       }),
       responses: {
         200: z.object({ url: z.string() }),
