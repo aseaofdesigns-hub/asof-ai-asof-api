@@ -124,84 +124,322 @@ const SEV_COLOR: Record<string, string> = {
   HIGH: "bg-red-500/10 text-red-400 border-red-500/20",
 };
 
-function downloadReport(result: CodeAnalysisResult, code: string) {
+async function svgToPng(svgStr: string, size: number): Promise<string> {
+  return new Promise((resolve) => {
+    const blob = new Blob([svgStr], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = size; canvas.height = size;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(""); };
+    img.src = url;
+  });
+}
+
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#1e1133"/>
+  <rect x="9" y="9" width="14" height="14" rx="2" fill="none" stroke="#a855f7" stroke-width="1.5"/>
+  <rect x="12.5" y="12.5" width="7" height="7" rx="1" fill="#a855f7" opacity="0.25"/>
+  <line x1="13" y1="9" x2="13" y2="6" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="19" y1="9" x2="19" y2="6" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="13" y1="23" x2="13" y2="26" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="19" y1="23" x2="19" y2="26" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="9" y1="13" x2="6" y2="13" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="9" y1="19" x2="6" y2="19" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="23" y1="13" x2="26" y2="13" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="23" y1="19" x2="26" y2="19" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
+</svg>`;
+
+async function downloadReport(result: CodeAnalysisResult, _code: string) {
+  const iconPng = await svgToPng(FAVICON_SVG, 64);
+
   const doc = new jsPDF();
   const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const M = 14;
+  const cW = pageW - M * 2;
+  const FOOTER_H = 16;
+  const MAX_Y = pageH - FOOTER_H - 4;
   const now = new Date();
 
-  doc.setFillColor(10, 10, 20);
-  doc.rect(0, 0, pageW, 42, "F");
+  const SEV_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+  const SEV_RGB: Record<string, [number,number,number]> = {
+    CRITICAL: [220,38,38], HIGH: [249,115,22], MEDIUM: [217,119,6], LOW: [59,130,246],
+  };
+  const RISK_RGB: Record<string, [number,number,number]> = {
+    SAFE: [34,197,94], NEEDS_REVIEW: [251,191,36], RISKY: [249,115,22], CRITICAL: [239,68,68],
+  };
+  const SCORE_MAP: Record<string, number> = { SAFE: 90, NEEDS_REVIEW: 62, RISKY: 32, CRITICAL: 10 };
+
+  let y = 0;
+  let pageNum = 1;
+
+  function addFooter() {
+    doc.setFillColor(14, 10, 26);
+    doc.rect(0, pageH - FOOTER_H, pageW, FOOTER_H, "F");
+    doc.setTextColor(120, 120, 150);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.text("ASOF.ai — asofai.com  |  Support@asofai.com", M, pageH - 5);
+    doc.text(`Page ${pageNum}`, pageW - M, pageH - 5, { align: "right" });
+  }
+
+  function newPage() {
+    addFooter();
+    doc.addPage();
+    pageNum++;
+    doc.setFillColor(14, 10, 26);
+    doc.rect(0, 0, pageW, 10, "F");
+    doc.setTextColor(160, 140, 200);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text("ASOF.ai — AI Code Analysis Report (continued)", M, 7);
+    y = 18;
+  }
+
+  function checkY(need: number) { if (y + need > MAX_Y) newPage(); }
+
+  function sectionHeader(label: string) {
+    checkY(18);
+    doc.setFillColor(168, 85, 247);
+    doc.rect(M, y, 3, 9, "F");
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 20, 50);
+    doc.text(label, M + 7, y + 7);
+    y += 14;
+  }
+
+  function sevBadge(sev: string, bx: number, by: number): number {
+    const col = SEV_RGB[sev] ?? [100,100,120];
+    const label = sev;
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...col);
+    const tw = doc.getTextWidth(label) + 6;
+    doc.setDrawColor(...col);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(bx, by - 5, tw, 6.5, 1, 1, "S");
+    doc.text(label, bx + 3, by);
+    return tw + 4;
+  }
+
+  // ── HEADER ──────────────────────────────────────────────────────
+  doc.setFillColor(14, 10, 26);
+  doc.rect(0, 0, pageW, 46, "F");
+
+  if (iconPng) doc.addImage(iconPng, "PNG", M, 8, 12, 12);
+
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
-  doc.text("ASOF.ai", 14, 18);
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(160, 160, 180);
-  doc.text("AI Code Assumption Analysis Report", 14, 28);
-  doc.text(`Generated: ${now.toLocaleString()}`, 14, 36);
+  doc.text("ASOF.ai", iconPng ? M + 16 : M, 17);
 
-  let y = 54;
-  const riskColors: Record<string, [number, number, number]> = {
-    SAFE: [34, 197, 94],
-    NEEDS_REVIEW: [251, 191, 36],
-    RISKY: [249, 115, 22],
-    CRITICAL: [239, 68, 68],
-  };
-  const rc = riskColors[result.risk_level] ?? [107, 114, 128];
-  doc.setFontSize(14);
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(180, 150, 230);
+  doc.text("AI Code Assumption Analysis Report", iconPng ? M + 16 : M, 26);
+  doc.setTextColor(130, 120, 160);
+  doc.text(`Generated: ${now.toLocaleString()}`, iconPng ? M + 16 : M, 34);
+  if (result.tier) {
+    const tierLabel = result.tier.toUpperCase() + " TIER";
+    doc.setFillColor(168, 85, 247, 0.3);
+    doc.setDrawColor(168, 85, 247);
+    doc.setLineWidth(0.4);
+    const tw = doc.getTextWidth(tierLabel) + 8;
+    doc.roundedRect(pageW - M - tw, 28, tw, 8, 2, 2, "S");
+    doc.setTextColor(200, 150, 255);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text(tierLabel, pageW - M - tw + 4, 34);
+  }
+
+  y = 56;
+
+  // ── 1. RISK SUMMARY ─────────────────────────────────────────────
+  const rc = RISK_RGB[result.risk_level] ?? [107,114,128];
+  const score = SCORE_MAP[result.risk_level] ?? 50;
+
+  doc.setFontSize(15);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...rc);
-  doc.text(`Risk Level: ${result.risk_level.replace("_", " ")}`, 14, y);
-  y += 8;
+  doc.text(`Risk Level: ${result.risk_level.replace("_"," ")}`, M, y);
+
+  // Score pill top-right
+  const scoreLabel = `${score}% safe`;
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  const spW = doc.getTextWidth(scoreLabel) + 10;
+  doc.setDrawColor(...rc);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(pageW - M - spW, y - 8, spW, 10, 2, 2, "S");
+  doc.setTextColor(...rc);
+  doc.text(scoreLabel, pageW - M - spW + 5, y);
+
+  y += 7;
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(60, 60, 80);
-  const sumLines = doc.splitTextToSize(result.summary, pageW - 28);
-  doc.text(sumLines, 14, y);
-  y += sumLines.length * 5 + 10;
+  doc.setTextColor(55, 45, 75);
+  const sumLines = doc.splitTextToSize(result.summary, cW);
+  checkY(sumLines.length * 5 + 6);
+  doc.text(sumLines, M, y);
+  y += sumLines.length * 5 + 12;
 
+  // ── 2. FIX THESE FIRST ──────────────────────────────────────────
+  const allItems = [
+    ...(result.risks ?? []),
+    ...(result.assumptions ?? []),
+  ].sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
+  const topFixes = allItems.filter(i => i.severity === "CRITICAL" || i.severity === "HIGH").slice(0, 3);
+
+  if (topFixes.length > 0) {
+    sectionHeader("Fix These First");
+    topFixes.forEach((fix, idx) => {
+      const lines = doc.splitTextToSize(fix.text, cW - 22);
+      checkY(lines.length * 5 + 10);
+      const col = SEV_RGB[fix.severity] ?? [120,120,140];
+      doc.setFillColor(...col);
+      doc.circle(M + 5, y + 1, 4.5, "F");
+      doc.setTextColor(255,255,255);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${idx + 1}`, M + 5, y + 3.5, { align: "center" });
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(40, 30, 60);
+      doc.text(lines, M + 13, y + 1);
+      y += lines.length * 5 + 6;
+    });
+    y += 4;
+  }
+
+  // ── 3. WHAT THE AI ASSUMED ───────────────────────────────────────
   if (result.assumptions?.length) {
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(30, 30, 40);
-    doc.text("What the AI Assumed", 14, y);
-    y += 7;
-    for (const a of result.assumptions) {
-      doc.setFont("helvetica", "normal");
+    sectionHeader("What the AI Assumed");
+    const sorted = [...result.assumptions].sort(
+      (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9)
+    );
+    for (const a of sorted) {
+      const lines = doc.splitTextToSize(a.text, cW - 30);
+      checkY(lines.length * 5 + 8);
+      const bw = sevBadge(a.severity, M, y);
       doc.setFontSize(9);
-      doc.setTextColor(60, 60, 80);
-      const lines = doc.splitTextToSize(`• ${a.text}`, pageW - 28);
-      doc.text(lines, 16, y);
-      y += lines.length * 4.5 + 2;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(55, 50, 80);
+      doc.text(lines, M + bw, y);
+      y += Math.max(lines.length * 5, 7) + 4;
     }
     y += 4;
   }
 
+  // ── 4. WHAT COULD BREAK ─────────────────────────────────────────
   if (result.risks?.length) {
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(30, 30, 40);
-    doc.text("What Could Break", 14, y);
-    y += 7;
-    for (const r of result.risks) {
-      doc.setFont("helvetica", "normal");
+    sectionHeader("What Could Break");
+    const sorted = [...result.risks].sort(
+      (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9)
+    );
+    for (const r of sorted) {
+      const lines = doc.splitTextToSize(r.text, cW - 30);
+      checkY(lines.length * 5 + 8);
+      const bw = sevBadge(r.severity, M, y);
       doc.setFontSize(9);
-      doc.setTextColor(60, 60, 80);
-      const lines = doc.splitTextToSize(`• ${r.text}`, pageW - 28);
-      doc.text(lines, 16, y);
-      y += lines.length * 4.5 + 2;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(55, 50, 80);
+      doc.text(lines, M + bw, y);
+      y += Math.max(lines.length * 5, 7) + 4;
     }
     y += 4;
   }
 
-  const pageH = doc.internal.pageSize.getHeight();
-  doc.setFillColor(10, 10, 20);
-  doc.rect(0, pageH - 14, pageW, 14, "F");
-  doc.setTextColor(120, 120, 140);
-  doc.setFontSize(8);
-  doc.text("ASOF.ai — asofai.com  |  Support@asofai.com", 14, pageH - 5);
+  // ── 5. VERIFY CHECKLIST ──────────────────────────────────────────
+  if (result.checks?.length) {
+    sectionHeader("Verify Checklist");
+    for (const c of result.checks) {
+      const lines = doc.splitTextToSize(`☐  ${c}`, cW - 8);
+      checkY(lines.length * 5 + 5);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(40, 100, 60);
+      doc.text(lines, M + 4, y);
+      y += lines.length * 5 + 3;
+    }
+    y += 4;
+  }
 
+  // ── 6. SUGGESTION CARDS ──────────────────────────────────────────
+  if (result.suggestions?.length) {
+    sectionHeader("Suggestion Cards");
+    for (const s of result.suggestions) {
+      const probLines = doc.splitTextToSize(s.problem, cW - 8);
+      const whyLines  = doc.splitTextToSize(s.why_it_matters, cW - 12);
+      const fixLines  = doc.splitTextToSize(s.fix, cW - 12);
+      const cardH = probLines.length * 5 + whyLines.length * 4.5 + fixLines.length * 4.5 + 22;
+      checkY(cardH + 6);
+
+      doc.setFillColor(248, 246, 254);
+      doc.setDrawColor(200, 180, 240);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(M, y - 2, cW, cardH, 2, 2, "FD");
+
+      doc.setFontSize(9.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(50, 30, 80);
+      doc.text(probLines, M + 5, y + 5);
+      y += probLines.length * 5 + 5;
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(180, 50, 50);
+      doc.text("Why it matters:", M + 5, y + 3);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(120, 50, 50);
+      doc.text(whyLines, M + 5, y + 8);
+      y += whyLines.length * 4.5 + 9;
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(40, 130, 80);
+      doc.text("Fix:", M + 5, y + 3);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(40, 100, 60);
+      doc.text(fixLines, M + 5, y + 8);
+      y += fixLines.length * 4.5 + 12;
+    }
+  }
+
+  // ── 7. SAFER CODE REWRITE (Max) ──────────────────────────────────
+  if (result.safer_code) {
+    sectionHeader("Suggested Safe Rewrite");
+    const codeLines = result.safer_code.split("\n");
+    const lineH = 4.2;
+    const visLines = Math.min(codeLines.length, Math.floor((MAX_Y - y - 12) / lineH));
+    const blockH = visLines * lineH + 10;
+    checkY(blockH + 6);
+
+    doc.setFillColor(14, 12, 28);
+    doc.setDrawColor(80, 50, 120);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(M, y - 2, cW, blockH, 2, 2, "FD");
+
+    doc.setFontSize(7.5);
+    doc.setFont("courier", "normal");
+    doc.setTextColor(180, 220, 180);
+    let cy = y + 5;
+    for (let i = 0; i < visLines; i++) {
+      const wrapped = doc.splitTextToSize(codeLines[i] || " ", cW - 10);
+      doc.text(wrapped[0] ?? " ", M + 5, cy);
+      cy += lineH;
+    }
+    y += blockH + 8;
+  }
+
+  // ── FOOTER on last page ──────────────────────────────────────────
+  addFooter();
   doc.save(`asof-report-${Date.now()}.pdf`);
 }
 
@@ -762,7 +1000,7 @@ export function RunAutomationForm() {
                     })()}
                     <button
                       data-testid="button-download-pdf"
-                      onClick={() => downloadReport(result, code)}
+                      onClick={() => void downloadReport(result, code)}
                       className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground hover:text-white transition-colors px-2 py-1 rounded border border-white/10 hover:border-white/20 bg-white/5"
                     >
                       <Download className="w-3 h-3" />
