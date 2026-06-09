@@ -46,18 +46,25 @@ export default function VerifyPayment() {
           description: `Upgraded to ${data.tier ? TIER_LABELS[data.tier] ?? data.tier : "next tier"}.`,
         });
       } else {
-        try {
-          const raw = localStorage.getItem("asof_sessions");
-          const sessions: Array<{ id: string; tier: string }> = raw ? JSON.parse(raw) : [];
-          sessions.push({ id: sessionId!, tier: data.tier ?? "lite" });
-          localStorage.setItem("asof_sessions", JSON.stringify(sessions));
-          localStorage.setItem("stripe_session_id", sessions[0].id);
-          if (data.tier) localStorage.setItem("purchased_tier", data.tier);
-        } catch {}
-        toast({
-          title: "Payment Successful",
-          description: "You can now run your analysis.",
-        });
+        (async () => {
+          let qty = 1;
+          try {
+            const qtyRes = await fetch(`/api/payment-quantity/${sessionId}`);
+            qty = qtyRes.ok ? ((await qtyRes.json()).quantity ?? 1) : 1;
+            const raw = localStorage.getItem("asof_sessions");
+            const sessions: Array<{ id: string; tier: string }> = raw ? JSON.parse(raw) : [];
+            for (let i = 0; i < qty; i++) {
+              sessions.push({ id: `${sessionId!}__${i}`, tier: data.tier ?? "lite" });
+            }
+            localStorage.setItem("asof_sessions", JSON.stringify(sessions));
+            localStorage.setItem("stripe_session_id", sessions[0].id);
+            if (data.tier) localStorage.setItem("purchased_tier", data.tier);
+          } catch {}
+          toast({
+            title: "Payment Successful",
+            description: qty > 1 ? `${qty} credits added — ready to analyze.` : "You can now run your analysis.",
+          });
+        })();
       }
     }
   }, [data, sessionId, toast]);

@@ -834,7 +834,7 @@ export async function registerRoutes(
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        line_items: [{ price: price_id, quantity: 1 }],
+        line_items: [{ price: price_id, quantity: 1, adjustable_quantity: { enabled: true, minimum: 1, maximum: 20 } }],
         mode: 'payment',
         success_url: `${baseUrl}/verify?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/`,
@@ -1269,6 +1269,18 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
     } catch (err: any) {
       console.error("analyze-code error:", err);
       res.status(500).json({ message: err?.message ?? "Analysis failed." });
+    }
+  });
+
+  // ── GET /api/payment-quantity/:sessionId — how many credits were purchased ──
+  app.get('/api/payment-quantity/:sessionId', async (req, res) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const lineItems = await stripe.checkout.sessions.listLineItems(req.params.sessionId, { limit: 1 });
+      const quantity = lineItems.data[0]?.quantity ?? 1;
+      res.json({ quantity });
+    } catch {
+      res.json({ quantity: 1 });
     }
   });
 
