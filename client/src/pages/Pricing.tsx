@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Lock, Zap, ShieldCheck, Loader2, Tag } from "lucide-react";
+import { CheckCircle2, Lock, Zap, ShieldCheck, Loader2, Tag, PartyPopper, X } from "lucide-react";
 
 const FEATURE_ROWS = [
   { label: "Risk Verdict", lite: true, pro: true, max: true },
@@ -58,7 +58,18 @@ const TIERS = [
 
 export default function Pricing() {
   const [loading, setLoading] = useState<string | null>(null);
+  const [purchasedTier, setPurchasedTier] = useState<string | null>(null);
+  const [showBanner, setShowBanner] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const tier = localStorage.getItem("purchased_tier");
+    if (tier) {
+      setPurchasedTier(tier);
+      setShowBanner(true);
+      localStorage.removeItem("purchased_tier");
+    }
+  }, []);
 
   const initiatePayment = async (tier: "lite" | "pro" | "max") => {
     setLoading(tier);
@@ -87,6 +98,39 @@ export default function Pricing() {
       <Header />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        {/* Success banner */}
+        <AnimatePresence>
+          {showBanner && purchasedTier && (
+            <motion.div
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.35 }}
+              data-testid="banner-purchase-success"
+              className="mb-8 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4"
+            >
+              <div className="flex items-center gap-3">
+                <PartyPopper className="w-5 h-5 text-emerald-400 shrink-0" />
+                <p className="text-sm font-semibold text-emerald-300">
+                  Payment confirmed! You're all set on the{" "}
+                  <span className="capitalize font-bold text-white">
+                    {TIERS.find((t) => t.id === purchasedTier)?.name ?? purchasedTier}
+                  </span>{" "}
+                  plan.
+                </p>
+              </div>
+              <button
+                data-testid="button-dismiss-banner"
+                onClick={() => setShowBanner(false)}
+                className="text-emerald-400/60 hover:text-emerald-300 transition-colors shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -114,13 +158,29 @@ export default function Pricing() {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14"
         >
-          {TIERS.map((tier) => (
+          {TIERS.map((tier) => {
+            const isActive = purchasedTier === tier.id;
+            const activeRingClass = isActive
+              ? tier.id === "lite"
+                ? "ring-2 ring-emerald-500/60 shadow-lg shadow-emerald-950/40"
+                : tier.id === "pro"
+                ? "ring-2 ring-blue-500/60 shadow-lg shadow-blue-950/40"
+                : "ring-2 ring-purple-500/60 shadow-lg shadow-purple-950/40"
+              : "";
+            return (
             <div
               key={tier.id}
               data-testid={`card-pricing-${tier.id}`}
-              className={`relative rounded-2xl border bg-white/[0.03] p-6 flex flex-col gap-5 transition-all ${tier.borderClass} ${tier.highlight ? "ring-1 ring-blue-500/30 shadow-lg shadow-blue-950/30" : ""}`}
+              className={`relative rounded-2xl border bg-white/[0.03] p-6 flex flex-col gap-5 transition-all ${tier.borderClass} ${tier.highlight && !isActive ? "ring-1 ring-blue-500/30 shadow-lg shadow-blue-950/30" : ""} ${activeRingClass}`}
             >
-              {tier.highlight && (
+              {isActive && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2" data-testid={`badge-active-${tier.id}`}>
+                  <span className={`px-3 py-1 rounded-full text-white text-[10px] font-bold uppercase tracking-wider shadow-md ${tier.id === "lite" ? "bg-emerald-600" : tier.id === "pro" ? "bg-blue-600" : "bg-purple-600"}`}>
+                    ✓ Active
+                  </span>
+                </div>
+              )}
+              {!isActive && tier.highlight && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="px-3 py-1 rounded-full bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider shadow-md">
                     Most Popular
@@ -168,7 +228,8 @@ export default function Pricing() {
                 )}
               </Button>
             </div>
-          ))}
+          );
+          })}
         </motion.div>
 
         {/* Feature comparison table */}

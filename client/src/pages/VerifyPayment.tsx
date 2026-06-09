@@ -28,6 +28,9 @@ export default function VerifyPayment() {
   useEffect(() => {
     if (data?.status === "paid") {
       localStorage.setItem("stripe_session_id", sessionId!);
+      if (data.tier) {
+        localStorage.setItem("purchased_tier", data.tier);
+      }
       toast({
         title: "Payment Successful",
         description: "You can now run your automation.",
