@@ -74,3 +74,23 @@
     transform: translateY(0);
   }
 }
+
+/* ── Global dark scrollbars ───────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
+}
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}

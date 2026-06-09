@@ -155,7 +155,7 @@ const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
   <line x1="23" y1="19" x2="26" y2="19" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
 </svg>`;
 
-async function downloadReport(result: CodeAnalysisResult, _code: string) {
+export async function downloadReport(result: CodeAnalysisResult, _code: string) {
   const iconPng = await svgToPng(FAVICON_SVG, 64);
 
   const doc = new jsPDF();
@@ -443,7 +443,7 @@ async function downloadReport(result: CodeAnalysisResult, _code: string) {
   doc.save(`asof-report-${Date.now()}.pdf`);
 }
 
-export function RunAutomationForm({ onSaferCode }: { onSaferCode?: (original: string, safer: string) => void }) {
+export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalysisResult, code: string) => void }) {
   const [code, setCode] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -527,7 +527,7 @@ export function RunAutomationForm({ onSaferCode }: { onSaferCode?: (original: st
         const data = await res.json();
         setResult(data);
         setAnalysisId(id);
-        if (data.safer_code) onSaferCode?.(code, data.safer_code);
+        onResult?.(data, code);
         toast({ title: "Analysis loaded", description: `Upgraded to ${data.tier?.toUpperCase() ?? 'new tier'}` });
       }
     } catch {}
@@ -623,7 +623,7 @@ export function RunAutomationForm({ onSaferCode }: { onSaferCode?: (original: st
       if (data.analysisId) setAnalysisId(data.analysisId);
       if (asFree) setFreeTrialAvailable(false);
       if (paidSessionId && !asFree) consumeSession(paidSessionId);
-      if (data.safer_code) onSaferCode?.(code, data.safer_code);
+      onResult?.(data, code);
       toast({ title: "Analysis complete", description: `Risk level: ${data.risk_level?.replace("_", " ")}` });
     } catch (err) {
       toast({ title: "Analysis failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
@@ -1018,65 +1018,11 @@ export function RunAutomationForm({ onSaferCode }: { onSaferCode?: (original: st
                 )}
               </div>
 
-              {/* What the AI assumed */}
-              {result.assumptions?.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🔍 What the AI assumed</p>
-                  {result.assumptions.map((a, i) => (
-                    <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/15">
-                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase ${SEV_COLOR[a.severity]}`}>{a.severity}</span>
-                      <p className="text-xs text-white/75 leading-relaxed">{a.text}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* What could break */}
-              {result.risks?.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">💥 What could break</p>
-                  {result.risks.map((r, i) => (
-                    <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/15">
-                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase ${SEV_COLOR[r.severity]}`}>{r.severity}</span>
-                      <p className="text-xs text-white/75 leading-relaxed">{r.text}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* What to verify */}
-              {result.checks?.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">✅ What to verify</p>
-                  <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 space-y-1.5">
-                    {result.checks.map((c, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-amber-500/60 shrink-0 mt-0.5">□</span>
-                        <p className="text-xs text-white/75 leading-relaxed">{c}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Suggestion cards */}
-              {result.suggestions?.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🛠 Suggestions</p>
-                  {result.suggestions.map((s, i) => (
-                    <div key={i} className="p-3 rounded-lg bg-white/5 border border-white/10 space-y-1.5">
-                      <p className="text-xs font-bold text-white">{s.problem}</p>
-                      <p className="text-[10px] text-red-300/70 leading-snug"><span className="font-semibold text-red-400/90">Why it matters:</span> {s.why_it_matters}</p>
-                      <p className="text-[10px] text-emerald-300/70 leading-snug"><span className="font-semibold text-emerald-400/90">Fix:</span> {s.fix}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Safer code lives in the right panel (Dashboard) */}
-              {result.safer_code && (
-                <p className="text-[10px] text-emerald-400/70 flex items-center gap-1.5">
-                  🚦 Safer code rewrite ready — see panel on the right
+              {/* Full analysis detail lives in the panel below */}
+              {(result.assumptions?.length > 0 || result.risks?.length > 0 || result.checks?.length || result.suggestions?.length || result.safer_code) && (
+                <p className="text-[10px] text-primary/60 font-medium flex items-center gap-1">
+                  <span>Full report with all details shown below</span>
+                  <span className="text-primary/40">↓</span>
                 </p>
               )}
 

@@ -1,0 +1,107 @@
+Fix the ASOF report layout and code preview readability.
+
+Problems:
+- The report cards are stacked in a narrow column, leaving too much empty space on the right.
+- The code sections are too long and hard to read.
+- “Safer Suggested Code” font is too small.
+- The white scrollbars do not match the dark UI.
+- Users need a way to expand long sections instead of reading everything in a tiny panel.
+
+Requested changes:
+
+1. Make report tiles display side-by-side
+On desktop, show assumption/risk/suggestion tiles in a responsive grid:
+- 2 columns minimum
+- 3 columns if there is enough space
+- 1 column only on mobile
+
+Use the available page width instead of keeping everything in one narrow left column.
+
+2. Make tiles expandable
+Each tile/card should have a compact preview state:
+- Show severity tag
+- Show title or first 1-2 lines
+- Show “View details” or expand icon
+
+When clicked:
+- Expand the tile inline OR open a modal/drawer
+- Show the full explanation, why it matters, and fix
+- Clicking again collapses it
+
+Best option:
+Use a modal or right-side drawer for full details so the page stays clean.
+
+3. Improve code preview layout
+For “Original AI Code” and “Safer Suggested Code”:
+- Keep them side-by-side on desktop
+- Stack them on mobile
+- Add an expand/fullscreen button to each code panel
+- Add a “View full code” button
+- Add a copy button
+
+4. Make code readable
+Increase code font size.
+
+Use:
+- Desktop code font: 14px or 15px
+- Mobile code font: 13px or 14px
+- Line height: 1.6
+- Use a readable monospace font
+
+The Safer Suggested Code is currently too small and should be as readable as the original code.
+
+5. Set code panel height
+Do not let long code make the whole page awkward.
+
+Use:
+- Code panel max height: 420px to 520px on desktop
+- Internal scrolling inside the code panel
+- Fullscreen/modal view for reading the entire code comfortably
+
+6. Style scrollbars to match dark mode
+Do not use bright white scrollbars.
+
+Use dark custom scrollbar styling:
+- Track: transparent or #0b1020
+- Thumb: #334155 or #475569
+- Thumb hover: #64748b
+
+Also use:
+scrollbar-width: thin;
+scrollbar-color: #475569 transparent;
+
+For WebKit:
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+7. Use the empty right-side space
+The full report should use the available width. Suggested layout:
+- Top: Risk Summary full width
+- Below: Top Fixes full width
+- Then: Assumptions / What Could Break / Suggestions in a card grid
+- Then: Safer Suggested Code side-by-side with Original Code
+
+8. Add section tabs or filters if needed
+For long reports, add tabs:
+- Summary
+- Assumptions
+- Risks
+- Suggestions
+- Safe Rewrite
+
+This prevents the page from becoming one long scroll.
+
+Goal:
+Make the report feel like a polished dashboard, not one long narrow document. Users should be able to scan the report quickly, click tiles to expand details, and read the safer suggested code without straining.
