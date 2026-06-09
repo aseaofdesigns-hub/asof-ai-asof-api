@@ -5,10 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Play, CheckCircle2, Lock, DollarSign, Zap, ShieldCheck } from "lucide-react";
+import { Loader2, Play, CheckCircle2, Lock, DollarSign, Zap, ShieldCheck, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
 
 type RemediationStep = {
   step: number;
@@ -99,6 +100,116 @@ export function RunAutomationForm() {
         variant: "destructive",
       });
     }
+  };
+
+  const downloadPDF = (d: any, agentId: string, isFree: boolean) => {
+    const doc = new jsPDF();
+    const now = new Date();
+    const pageW = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(10, 10, 20);
+    doc.rect(0, 0, pageW, 40, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("ASOF.ai", 14, 18);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(160, 160, 180);
+    doc.text("AI Assumption Validation Report", 14, 27);
+    doc.text(`Generated: ${now.toLocaleString()}`, 14, 34);
+
+    let y = 52;
+    doc.setTextColor(30, 30, 40);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Validation Summary", 14, y);
+    y += 8;
+
+    doc.setFillColor(245, 247, 250);
+    doc.roundedRect(12, y, pageW - 24, 38, 3, 3, "F");
+    y += 8;
+
+    const verdictColors: Record<string, [number, number, number]> = {
+      VALID: [34, 197, 94],
+      INVALID: [239, 68, 68],
+      CONFLICTED: [249, 115, 22],
+      STALE: [168, 85, 247],
+      UNKNOWN: [107, 114, 128],
+    };
+    const vColor = verdictColors[d.assumption_verdict] ?? [107, 114, 128];
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...vColor);
+    doc.text(d.assumption_verdict ?? "UNKNOWN", 20, y + 4);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 100);
+    doc.text(`Confidence: ${((d.assumption_confidence ?? 0) * 100).toFixed(1)}%`, 20, y + 14);
+    doc.text(`Agent ID: ${agentId}`, 20, y + 22);
+    doc.text(`Tier: ${isFree ? "FREE TRIAL (Lite)" : (d.tier ?? "Lite").toUpperCase()}`, 100, y + 14);
+    doc.text(`Timestamp: ${d.timestamp ? new Date(d.timestamp).toLocaleString() : now.toLocaleString()}`, 100, y + 22);
+    y += 46;
+
+    if (d.explanation) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 30, 40);
+      doc.text("Explanation", 14, y);
+      y += 6;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 80);
+      const lines = doc.splitTextToSize(d.explanation, pageW - 28);
+      doc.text(lines, 14, y);
+      y += lines.length * 5 + 6;
+    }
+
+    if (d.gated) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(200, 100, 0);
+      doc.text("Note: Full analysis requires a paid tier upgrade.", 14, y);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(150, 80, 0);
+      y += 6;
+      doc.text("Visit asofai.com to unlock explanation, evidence, and remediation steps.", 14, y);
+      y += 10;
+    }
+
+    if (!d.gated && d.remediation?.remediation_required) {
+      const rem = d.remediation;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 30, 40);
+      doc.text("Remediation Steps", 14, y);
+      y += 6;
+      rem.steps.forEach((s: any) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(50, 50, 70);
+        doc.text(`Step ${s.step}: ${s.action}`, 16, y);
+        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 100);
+        const detail = doc.splitTextToSize(s.detail, pageW - 32);
+        doc.text(detail, 18, y);
+        y += detail.length * 4.5 + 3;
+      });
+      y += 4;
+    }
+
+    doc.setFillColor(10, 10, 20);
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.rect(0, pageH - 14, pageW, 14, "F");
+    doc.setTextColor(120, 120, 140);
+    doc.setFontSize(8);
+    doc.text("ASOF.ai — asofai.com  |  Support@asofai.com", 14, pageH - 5);
+
+    const fileName = `asof-report-${agentId}-${Date.now()}.pdf`;
+    doc.save(fileName);
   };
 
   const handleFreeRun = async () => {
@@ -239,10 +350,20 @@ export function RunAutomationForm() {
                         "{d.explanation}"
                       </p>
                     )}
-                    <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
-                      <span>Conf: {(d.assumption_confidence * 100).toFixed(1)}%</span>
-                      {d.risk_level && <span>Risk: {d.risk_level}</span>}
-                      <span>{d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : ""}</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
+                        <span>Conf: {(d.assumption_confidence * 100).toFixed(1)}%</span>
+                        {d.risk_level && <span>Risk: {d.risk_level}</span>}
+                        <span>{d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : ""}</span>
+                      </div>
+                      <button
+                        data-testid="button-download-pdf"
+                        onClick={() => downloadPDF(d, agentId, !!freeTrialData)}
+                        className="flex items-center gap-1 text-[9px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-0.5 rounded border border-emerald-500/30 hover:border-emerald-400/50 bg-emerald-500/5 hover:bg-emerald-500/10"
+                      >
+                        <Download className="w-3 h-3" />
+                        PDF
+                      </button>
                     </div>
                   </div>
                 </div>
