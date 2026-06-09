@@ -64,15 +64,36 @@ export default function About() {
           {/* Hero */}
           <div className="text-center space-y-5">
             <motion.div variants={item} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary uppercase tracking-widest">
-              What ASOF does
+              A second opinion before you trust AI code
             </motion.div>
             <motion.h1 variants={item} className="text-4xl md:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/50">
-              What did your AI assume?
+              ASOF finds the hidden assumptions in AI-generated code before you trust it.
             </motion.h1>
             <motion.p variants={item} className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Paste your AI-generated signals or connect your agent. ASOF finds risky assumptions, missing checks, and places where the AI may have guessed — before those guesses cause real damage.
+              The scary part of AI-generated code isn't the syntax bugs. It's that the AI guessed something, sounded confident, and you shipped it. ASOF catches those guesses before they become your problem.
             </motion.p>
           </div>
+
+          {/* The four outputs */}
+          <motion.div variants={item} className="space-y-3">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">What you get back</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {[
+                { emoji: "🔍", label: "What the AI assumed", desc: "Hidden context the AI filled in without being told — about your auth, data format, API behavior, ordering, or environment.", color: "border-blue-500/20 bg-blue-500/5" },
+                { emoji: "💥", label: "What could break", desc: "The specific failure modes those assumptions create — race conditions, wrong amounts, unauthorized access, stale state.", color: "border-red-500/20 bg-red-500/5" },
+                { emoji: "✅", label: "What you should verify", desc: "A concrete checklist of things to confirm before running, deploying, or copying the code into your project.", color: "border-amber-500/20 bg-amber-500/5" },
+                { emoji: "🚦", label: "Safe to run / Risky / Needs review", desc: "A confidence-scored verdict so you know at a glance whether to trust it, fix it, or ask your AI to try again.", color: "border-emerald-500/20 bg-emerald-500/5" },
+              ].map((o, i) => (
+                <div key={i} className={`glass-card p-5 rounded-xl border ${o.color} space-y-2`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{o.emoji}</span>
+                    <p className="font-bold text-sm text-white">{o.label}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{o.desc}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
 
           {/* How it's different */}
           <motion.div variants={item} className="glass-card p-8 rounded-2xl border border-white/10 space-y-4">
@@ -82,18 +103,22 @@ export default function About() {
               </div>
               <h2 className="text-xl font-bold">Not a test. Not a linter. Something different.</h2>
             </div>
-            <div className="grid md:grid-cols-3 gap-4 text-sm">
+            <div className="grid md:grid-cols-4 gap-3 text-sm">
               <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-                <p className="font-semibold text-white/80 mb-1">Tests ask:</p>
-                <p className="text-muted-foreground">"Does this code behave as expected?"</p>
+                <p className="font-semibold text-white/70 mb-1 text-xs">Linters</p>
+                <p className="text-muted-foreground text-xs">"Is this code styled and safe?"</p>
               </div>
               <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-                <p className="font-semibold text-white/80 mb-1">Linters ask:</p>
-                <p className="text-muted-foreground">"Is this code styled and safe?"</p>
+                <p className="font-semibold text-white/70 mb-1 text-xs">Tests</p>
+                <p className="text-muted-foreground text-xs">"Does it behave as expected?"</p>
+              </div>
+              <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                <p className="font-semibold text-white/70 mb-1 text-xs">Code review tools</p>
+                <p className="text-muted-foreground text-xs">"Are there bugs or security issues?"</p>
               </div>
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
-                <p className="font-semibold text-primary mb-1">ASOF asks:</p>
-                <p className="text-muted-foreground">"Is the <em>reasoning</em> behind this code still trustworthy?"</p>
+                <p className="font-semibold text-primary mb-1 text-xs">ASOF</p>
+                <p className="text-muted-foreground text-xs">"Is the <em>reasoning</em> behind this trustworthy?"</p>
               </div>
             </div>
           </motion.div>

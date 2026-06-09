@@ -56,9 +56,9 @@ export default function Dashboard() {
           className="space-y-8"
         >
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">As-of AI Automation</h1>
+            <h1 className="text-3xl font-bold tracking-tight">ASOF finds the hidden assumptions in AI-generated code before you trust it.</h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
-              Paste your signals or connect your agent. ASOF finds risky assumptions, missing checks, and places where the AI may have guessed — returning a confidence-scored verdict you can act on.
+              Paste your signals and get back: what the AI assumed, what could break, what to verify, and whether it's safe to run — before you ship it.
             </p>
           </div>
 
