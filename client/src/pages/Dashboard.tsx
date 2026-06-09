@@ -4,12 +4,13 @@ import { StatCard } from "@/components/StatCard";
 import { RunAutomationForm } from "@/components/RunAutomationForm";
 import { SignalsTable } from "@/components/SignalsTable";
 import { ConfidenceChart } from "@/components/ConfidenceChart";
-import { useCodeAnalyses } from "@/hooks/use-automation";
+import { useCodeAnalyses, useSignals } from "@/hooks/use-automation";
 import { Activity, Zap, BarChart3, Database, ShieldCheck, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Dashboard() {
   const { data: analyses } = useCodeAnalyses();
+  const { data: signals } = useSignals();
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,12 +28,22 @@ export default function Dashboard() {
     }
   }
 
-  const totalSignals = analyses?.length || 0;
-  const avgConfidence = analyses?.length
+  const hasAnalyses = analyses && analyses.length > 0;
+
+  const totalSignals = hasAnalyses
+    ? analyses.length
+    : (signals?.length || 0);
+
+  const avgConfidence = hasAnalyses
     ? (analyses.reduce((acc, curr) => acc + riskToScore(curr.riskLevel), 0) / analyses.length * 100).toFixed(1)
+    : signals?.length
+    ? (signals.reduce((acc, s) => acc + s.confidence, 0) / signals.length * 100).toFixed(1)
     : "0.0";
-  const lastActive = analyses?.length
+
+  const lastActive = hasAnalyses
     ? new Date(analyses[0].timestamp!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : signals?.length
+    ? new Date(signals[0].timestamp!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : "--:--";
 
   const container = {
