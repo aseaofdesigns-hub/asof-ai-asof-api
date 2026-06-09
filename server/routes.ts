@@ -1127,7 +1127,8 @@ export async function registerRoutes(
       // Determine tier
       let tier: 'free' | 'lite' | 'pro' | 'max' = 'free';
       if (sessionId) {
-        const payment = await storage.getPaymentBySessionId(sessionId);
+        const rawSessionId = sessionId.replace(/__\d+$/, '');
+        const payment = await storage.getPaymentBySessionId(rawSessionId);
         if (payment && payment.status === 'paid') {
           tier = (payment.tier as any) ?? 'lite';
         } else {
