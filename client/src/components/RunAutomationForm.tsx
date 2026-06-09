@@ -456,29 +456,60 @@ export function RunAutomationForm() {
         )}
 
         {freeTrialAvailable && (
-          <div className="flex items-center gap-3 py-1">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-[9px] text-muted-foreground uppercase tracking-widest">or pay for deeper analysis</span>
-            <div className="flex-1 h-px bg-white/10" />
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 py-1">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-[9px] text-muted-foreground uppercase tracking-widest">or pay for deeper analysis</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            {/* Feature comparison table */}
+            <div className="rounded-xl border border-white/10 overflow-hidden text-[9px]">
+              <div className="grid grid-cols-4 bg-white/5 border-b border-white/10">
+                <div className="p-2 text-muted-foreground font-semibold uppercase tracking-wider">Feature</div>
+                <div className="p-2 text-center text-emerald-400 font-bold">Lite<br/><span className="text-white/60 font-normal normal-case tracking-normal">$0.50</span></div>
+                <div className="p-2 text-center text-blue-400 font-bold">Pro<br/><span className="text-white/60 font-normal normal-case tracking-normal">$1.00</span></div>
+                <div className="p-2 text-center text-purple-400 font-bold">Max<br/><span className="text-white/60 font-normal normal-case tracking-normal">$2.50</span></div>
+              </div>
+              {[
+                { label: "Verdict (risk level)", lite: true, pro: true, max: true },
+                { label: "Assumptions", lite: true, pro: true, max: true },
+                { label: "What Could Break", lite: true, pro: true, max: true },
+                { label: "Verify Checklist", lite: false, pro: true, max: true },
+                { label: "Suggestion Cards", lite: false, pro: true, max: true },
+                { label: "Safer Code Rewrite", lite: false, pro: false, max: true },
+              ].map((row, i) => (
+                <div key={i} className={`grid grid-cols-4 border-b border-white/5 last:border-0 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
+                  <div className="p-2 text-muted-foreground">{row.label}</div>
+                  {[row.lite, row.pro, row.max].map((has, j) => (
+                    <div key={j} className="p-2 flex justify-center items-center">
+                      {has
+                        ? <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        : <Lock className="w-3 h-3 text-white/20" />}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {tiers.map(tier => (
+              <button
+                key={tier.id}
+                data-testid={`button-tier-${tier.id}`}
+                onClick={() => initiatePayment(tier.id)}
+                className="flex items-center justify-between w-full p-2.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded bg-white/5">{tier.icon}</div>
+                  <div>
+                    <p className="text-[10px] font-bold text-white">{tier.name} — {tier.price}</p>
+                    <p className="text-[9px] text-muted-foreground">{tier.unlocks.join(' · ')}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
         )}
-
-        {freeTrialAvailable && tiers.map(tier => (
-          <button
-            key={tier.id}
-            data-testid={`button-tier-${tier.id}`}
-            onClick={() => initiatePayment(tier.id)}
-            className="flex items-center justify-between w-full p-2.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-1 rounded bg-white/5">{tier.icon}</div>
-              <div>
-                <p className="text-[10px] font-bold text-white">{tier.name} — {tier.price}</p>
-                <p className="text-[9px] text-muted-foreground">{tier.unlocks.join(' · ')}</p>
-              </div>
-            </div>
-          </button>
-        ))}
 
         {/* Results */}
         <AnimatePresence>
