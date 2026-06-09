@@ -1,39 +1,13 @@
 import { useState, useEffect } from "react";
-import { useRunAutomation } from "@/hooks/use-automation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Play, CheckCircle2, Lock, DollarSign, Zap, ShieldCheck, Download } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import type { CodeAnalysisResult } from "@shared/routes";
 import jsPDF from "jspdf";
-
-type RemediationStep = {
-  step: number;
-  action: string;
-  detail: string;
-  priority: "IMMEDIATE" | "SHORT_TERM" | "LONG_TERM";
-};
-
-type Remediation = {
-  remediation_required: boolean;
-  severity: "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  steps: RemediationStep[];
-  estimated_fix_time: string;
-  prevention_tips: string[];
-};
-
-const DEFAULT_JSON = JSON.stringify({
-  task: "analyze_market_sentiment",
-  parameters: {
-    symbol: "AAPL",
-    interval: "1d",
-    indicators: ["RSI", "MACD"]
-  }
-}, null, 2);
 
 function getFingerprint(): string {
   let fp = localStorage.getItem("asof_fp");
@@ -44,647 +18,457 @@ function getFingerprint(): string {
   return fp;
 }
 
+const RISK_META = {
+  SAFE: { label: "Safe to Run", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/30", icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" /> },
+  NEEDS_REVIEW: { label: "Needs Review", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30", icon: <AlertTriangle className="w-5 h-5 text-amber-400" /> },
+  RISKY: { label: "Risky", color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/30", icon: <AlertTriangle className="w-5 h-5 text-orange-400" /> },
+  CRITICAL: { label: "Critical Risk", color: "text-red-400", bg: "bg-red-500/10 border-red-500/30", icon: <XCircle className="w-5 h-5 text-red-400" /> },
+};
+
+const SEV_COLOR: Record<string, string> = {
+  LOW: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  MEDIUM: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  HIGH: "bg-red-500/10 text-red-400 border-red-500/20",
+};
+
+function downloadReport(result: CodeAnalysisResult, code: string) {
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+  const now = new Date();
+
+  doc.setFillColor(10, 10, 20);
+  doc.rect(0, 0, pageW, 42, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
+  doc.setFont("helvetica", "bold");
+  doc.text("ASOF.ai", 14, 18);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(160, 160, 180);
+  doc.text("AI Code Assumption Analysis Report", 14, 28);
+  doc.text(`Generated: ${now.toLocaleString()}`, 14, 36);
+
+  let y = 54;
+  const riskColors: Record<string, [number, number, number]> = {
+    SAFE: [34, 197, 94],
+    NEEDS_REVIEW: [251, 191, 36],
+    RISKY: [249, 115, 22],
+    CRITICAL: [239, 68, 68],
+  };
+  const rc = riskColors[result.risk_level] ?? [107, 114, 128];
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...rc);
+  doc.text(`Risk Level: ${result.risk_level.replace("_", " ")}`, 14, y);
+  y += 8;
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(60, 60, 80);
+  const sumLines = doc.splitTextToSize(result.summary, pageW - 28);
+  doc.text(sumLines, 14, y);
+  y += sumLines.length * 5 + 10;
+
+  if (result.assumptions?.length) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 30, 40);
+    doc.text("What the AI Assumed", 14, y);
+    y += 7;
+    for (const a of result.assumptions) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 80);
+      const lines = doc.splitTextToSize(`• ${a.text}`, pageW - 28);
+      doc.text(lines, 16, y);
+      y += lines.length * 4.5 + 2;
+    }
+    y += 4;
+  }
+
+  if (result.risks?.length) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 30, 40);
+    doc.text("What Could Break", 14, y);
+    y += 7;
+    for (const r of result.risks) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(60, 60, 80);
+      const lines = doc.splitTextToSize(`• ${r.text}`, pageW - 28);
+      doc.text(lines, 16, y);
+      y += lines.length * 4.5 + 2;
+    }
+    y += 4;
+  }
+
+  const pageH = doc.internal.pageSize.getHeight();
+  doc.setFillColor(10, 10, 20);
+  doc.rect(0, pageH - 14, pageW, 14, "F");
+  doc.setTextColor(120, 120, 140);
+  doc.setFontSize(8);
+  doc.text("ASOF.ai — asofai.com  |  Support@asofai.com", 14, pageH - 5);
+
+  doc.save(`asof-report-${Date.now()}.pdf`);
+}
+
 export function RunAutomationForm() {
-  const [agentId, setAgentId] = useState("agent-001");
-  const [payload, setPayload] = useState(DEFAULT_JSON);
-  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [userPrompt, setUserPrompt] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  const [result, setResult] = useState<CodeAnalysisResult | null>(null);
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
   const [freeTrialAvailable, setFreeTrialAvailable] = useState<boolean | null>(null);
-  const [freeTrialRunning, setFreeTrialRunning] = useState(false);
-  const [freeTrialData, setFreeTrialData] = useState<any>(null);
+  const [selectedTier, setSelectedTier] = useState<'lite' | 'pro' | 'max' | null>(null);
+  const [showSaferCode, setShowSaferCode] = useState(false);
   const { toast } = useToast();
-  
-  const { mutate: runAutomation, isPending: isRunning, data } = useRunAutomation();
 
   useEffect(() => {
     const saved = localStorage.getItem("stripe_session_id");
     if (saved) setPaidSessionId(saved);
-
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "stripe_session_id" && e.newValue) {
-        setPaidSessionId(e.newValue);
-      }
+      if (e.key === "stripe_session_id" && e.newValue) setPaidSessionId(e.newValue);
     };
     window.addEventListener("storage", onStorage);
-
     fetch(`/api/free-trial-status?fingerprint=${getFingerprint()}`)
       .then(r => r.json())
       .then(d => setFreeTrialAvailable(d.available))
       .catch(() => setFreeTrialAvailable(false));
-
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const initiatePayment = async (tier: 'lite' | 'pro' | 'max') => {
     try {
-      const res = await fetch(api.payments.create.path, { 
+      const res = await fetch('/api/create-payment', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier })
+        body: JSON.stringify({ tier }),
       });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to initiate payment");
-      }
+      if (!res.ok) throw new Error((await res.json()).message || "Payment failed");
       const { url } = await res.json();
-      const inIframe = window.self !== window.top;
-      if (inIframe) {
-        window.open(url, '_blank');
-      } else {
-        window.location.href = url;
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Payment initialization failed",
-        variant: "destructive",
-      });
+      if (window.self !== window.top) window.open(url, '_blank');
+      else window.location.href = url;
+    } catch (err) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Payment failed", variant: "destructive" });
     }
   };
 
-  const downloadPDF = (d: any, agentId: string, isFree: boolean) => {
-    const doc = new jsPDF();
-    const now = new Date();
-    const pageW = doc.internal.pageSize.getWidth();
-
-    doc.setFillColor(10, 10, 20);
-    doc.rect(0, 0, pageW, 40, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("ASOF.ai", 14, 18);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(160, 160, 180);
-    doc.text("AI Assumption Validation Report", 14, 27);
-    doc.text(`Generated: ${now.toLocaleString()}`, 14, 34);
-
-    let y = 52;
-    doc.setTextColor(30, 30, 40);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("Validation Summary", 14, y);
-    y += 8;
-
-    doc.setFillColor(245, 247, 250);
-    doc.roundedRect(12, y, pageW - 24, 38, 3, 3, "F");
-    y += 8;
-
-    const verdictColors: Record<string, [number, number, number]> = {
-      VALID: [34, 197, 94],
-      INVALID: [239, 68, 68],
-      CONFLICTED: [249, 115, 22],
-      STALE: [168, 85, 247],
-      UNKNOWN: [107, 114, 128],
-    };
-    const vColor = verdictColors[d.assumption_verdict] ?? [107, 114, 128];
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...vColor);
-    doc.text(d.assumption_verdict ?? "UNKNOWN", 20, y + 4);
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(80, 80, 100);
-    doc.text(`Confidence: ${((d.assumption_confidence ?? 0) * 100).toFixed(1)}%`, 20, y + 14);
-    doc.text(`Agent ID: ${agentId}`, 20, y + 22);
-    doc.text(`Tier: ${isFree ? "FREE TRIAL (Lite)" : (d.tier ?? "Lite").toUpperCase()}`, 100, y + 14);
-    doc.text(`Timestamp: ${d.timestamp ? new Date(d.timestamp).toLocaleString() : now.toLocaleString()}`, 100, y + 22);
-    y += 46;
-
-    if (d.explanation) {
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(30, 30, 40);
-      doc.text("Explanation", 14, y);
-      y += 6;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(60, 60, 80);
-      const lines = doc.splitTextToSize(d.explanation, pageW - 28);
-      doc.text(lines, 14, y);
-      y += lines.length * 5 + 6;
+  const runAnalysis = async (asFree = false) => {
+    if (!code.trim()) {
+      toast({ title: "Paste some code first", description: "Add at least a few lines of AI-generated code to analyze.", variant: "destructive" });
+      return;
     }
-
-    if (d.gated) {
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(200, 100, 0);
-      doc.text("Note: Full analysis requires a paid tier upgrade.", 14, y);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(150, 80, 0);
-      y += 6;
-      doc.text("Visit asofai.com to unlock explanation, evidence, and remediation steps.", 14, y);
-      y += 10;
-    }
-
-    if (!d.gated && d.remediation?.remediation_required) {
-      const rem = d.remediation;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(30, 30, 40);
-      doc.text("Remediation Steps", 14, y);
-      y += 6;
-      rem.steps.forEach((s: any) => {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(50, 50, 70);
-        doc.text(`Step ${s.step}: ${s.action}`, 16, y);
-        y += 5;
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(80, 80, 100);
-        const detail = doc.splitTextToSize(s.detail, pageW - 32);
-        doc.text(detail, 18, y);
-        y += detail.length * 4.5 + 3;
-      });
-      y += 4;
-    }
-
-    doc.setFillColor(10, 10, 20);
-    const pageH = doc.internal.pageSize.getHeight();
-    doc.rect(0, pageH - 14, pageW, 14, "F");
-    doc.setTextColor(120, 120, 140);
-    doc.setFontSize(8);
-    doc.text("ASOF.ai — asofai.com  |  Support@asofai.com", 14, pageH - 5);
-
-    const fileName = `asof-report-${agentId}-${Date.now()}.pdf`;
-    doc.save(fileName);
-  };
-
-  const handleFreeRun = async () => {
-    setJsonError(null);
+    setIsRunning(true);
+    setResult(null);
+    setShowSaferCode(false);
     try {
-      const parsedPayload = JSON.parse(payload);
-      setFreeTrialRunning(true);
-      const res = await fetch('/api/free-run', {
+      const body: any = { code, prompt: userPrompt || undefined };
+      if (asFree) body.fingerprint = getFingerprint();
+      else if (paidSessionId) body.sessionId = paidSessionId;
+
+      const res = await fetch('/api/analyze-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent_id: agentId,
-          payload: parsedPayload,
-          fingerprint: getFingerprint()
-        })
+        body: JSON.stringify(body),
       });
-      const result = await res.json();
+      const data = await res.json();
       if (!res.ok) {
-        if (result.trial_exhausted) {
-          setFreeTrialAvailable(false);
-        }
-        throw new Error(result.message || "Free trial failed");
+        if (data.trial_exhausted) setFreeTrialAvailable(false);
+        throw new Error(data.message || "Analysis failed");
       }
-      setFreeTrialData(result);
-      setFreeTrialAvailable(false);
-      toast({
-        title: "Free Trial Complete",
-        description: `${result.data.assumption_verdict} — ${(result.data.assumption_confidence * 100).toFixed(0)}% confidence`,
-      });
+      setResult(data);
+      if (asFree) setFreeTrialAvailable(false);
+      if (paidSessionId && !asFree) {
+        localStorage.removeItem("stripe_session_id");
+        setPaidSessionId(null);
+      }
+      toast({ title: "Analysis complete", description: `Risk level: ${data.risk_level?.replace("_", " ")}` });
     } catch (err) {
-      if (err instanceof SyntaxError) {
-        setJsonError("Invalid JSON format");
-      } else {
-        toast({
-          title: "Free Trial Failed",
-          description: err instanceof Error ? err.message : "Something went wrong",
-          variant: "destructive",
-        });
-      }
+      toast({ title: "Analysis failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
     } finally {
-      setFreeTrialRunning(false);
+      setIsRunning(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paidSessionId) return;
-    setJsonError(null);
-
-    try {
-      const parsedPayload = JSON.parse(payload);
-      runAutomation(
-        { agent_id: agentId, payload: parsedPayload, sessionId: paidSessionId },
-        {
-          onSuccess: () => {
-            localStorage.removeItem("stripe_session_id");
-            setPaidSessionId(null);
-          },
-        }
-      );
-    } catch (err) {
-      setJsonError("Invalid JSON format");
-    }
-  };
-
-  const isLocked = !paidSessionId;
-
-  const displayResult = freeTrialData || (data?.success ? data : null);
-  const d = displayResult?.data || null;
+  const risk = result ? (RISK_META[result.risk_level] ?? RISK_META.NEEDS_REVIEW) : null;
 
   const tiers = [
-    {
-      id: 'lite',
-      name: 'ASOF Lite',
-      price: '$0.50',
-      description: 'Single checks',
-      icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
-      color: 'emerald'
-    },
-    {
-      id: 'pro',
-      name: 'ASOF Pro',
-      price: '$1.00',
-      description: 'High-risk decisions',
-      icon: <Zap className="w-4 h-4 text-blue-400" />,
-      color: 'blue'
-    },
-    {
-      id: 'max',
-      name: 'ASOF Max',
-      price: '$2.50',
-      description: 'Mission-critical',
-      icon: <ShieldCheck className="w-4 h-4 text-purple-400" />,
-      color: 'purple'
-    }
-  ] as const;
+    { id: 'lite' as const, name: 'ASOF Lite', price: '$0.50', description: 'Risk level + all assumptions + what could break', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />, unlocks: ['Full assumption list', 'What could break'] },
+    { id: 'pro' as const, name: 'ASOF Pro', price: '$1.00', description: 'Everything in Lite + verify checklist + suggestion cards', icon: <Zap className="w-4 h-4 text-blue-400" />, unlocks: ['Verify checklist', 'Detailed suggestion cards'] },
+    { id: 'max' as const, name: 'ASOF Max', price: '$2.50', description: 'Full analysis + safer code rewrite side-by-side', icon: <ShieldCheck className="w-4 h-4 text-purple-400" />, unlocks: ['Side-by-side safer code', 'Full rewrite'] },
+  ];
 
   return (
-    <Card className="glass-card border-white/5 overflow-hidden h-full flex flex-col relative">
+    <Card className="glass-card border-white/5 overflow-hidden flex flex-col relative">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500" />
-      
+
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center justify-between text-lg">
-          <div className="flex items-center gap-2">
-            <Play className="w-5 h-5 text-primary" />
-            Run Automation
-          </div>
-          {isLocked && (
-            <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-tighter bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded border border-amber-500/20">
-              <Lock className="w-3 h-3" />
-              Locked
-            </div>
-          )}
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Code2 className="w-5 h-5 text-primary" />
+          Analyze AI-Generated Code
         </CardTitle>
+        <p className="text-xs text-muted-foreground">Paste code from Cursor, Claude, ChatGPT, or any AI tool. ASOF finds what it assumed.</p>
       </CardHeader>
-      
-      <CardContent className="flex-1 flex flex-col gap-4 overflow-y-auto">
-        <AnimatePresence>
-          {d && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden space-y-2"
-            >
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                  <div className="w-full">
-                    <h4 className="text-xs font-bold text-emerald-400 mb-0.5">
-                      {freeTrialData ? "Free Trial Complete" : "Validation Complete"}
-                    </h4>
-                    <p className="text-[10px] text-emerald-100/70 mb-1 leading-tight font-mono font-semibold">
-                      {d.assumption_verdict}
-                    </p>
-                    {d.explanation && (
-                      <p className="text-[9px] text-emerald-100/50 italic mb-1 leading-tight">
-                        "{d.explanation}"
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="flex items-center gap-3 text-[9px] font-mono text-emerald-400/60">
-                        <span>Conf: {(d.assumption_confidence * 100).toFixed(1)}%</span>
-                        {d.risk_level && <span>Risk: {d.risk_level}</span>}
-                        <span>{d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : ""}</span>
-                      </div>
-                      <button
-                        data-testid="button-download-pdf"
-                        onClick={() => downloadPDF(d, agentId, !!freeTrialData)}
-                        className="flex items-center gap-1 text-[9px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors px-2 py-0.5 rounded border border-emerald-500/30 hover:border-emerald-400/50 bg-emerald-500/5 hover:bg-emerald-500/10"
-                      >
-                        <Download className="w-3 h-3" />
-                        PDF
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {d.gated && (
-                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    {d.preview?.risk_level ? (
-                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                        d.preview.risk_level === "CRITICAL" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"
-                      }`}>
-                        {d.preview.risk_level} Severity
-                      </span>
-                    ) : (
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-orange-500/20 text-orange-400">
-                        {freeTrialData ? "Free Trial" : "Lite Tier"}
-                      </span>
-                    )}
-                    <span className="text-[8px] text-orange-300/60 font-mono">ACCESS RESTRICTED</span>
-                  </div>
-                  <p className="text-[9px] text-orange-200/70 leading-snug">{d.gated_message}</p>
-                  {d.preview?.hint && (
-                    <p className="text-[8px] text-orange-100/50 italic leading-tight">{d.preview.hint}</p>
-                  )}
-                  {d.upgrade_options?.length > 0 && (
-                    <div className="space-y-1.5 pt-1">
-                      {d.upgrade_options.map((opt: { tier: string; price: string; unlocks: string[] }) => (
-                        <div key={opt.tier} className="bg-white/5 border border-white/10 rounded p-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[9px] font-bold text-white/80 uppercase tracking-wider">{opt.tier}</span>
-                            <span className="text-[9px] font-mono text-emerald-400">{opt.price}</span>
-                          </div>
-                          <ul className="space-y-0.5">
-                            {opt.unlocks.map((u, i) => (
-                              <li key={i} className="text-[8px] text-white/40 flex gap-1">
-                                <span className="text-emerald-500/60">✓</span>{u}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+      <CardContent className="flex flex-col gap-4">
+        {/* Code input */}
+        <div className="space-y-2">
+          <Label htmlFor="code-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            AI-Generated Code
+          </Label>
+          <Textarea
+            id="code-input"
+            data-testid="input-code"
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            placeholder="Paste AI-generated code here..."
+            className="glass-input font-mono text-xs min-h-[160px] resize-y leading-relaxed"
+            spellCheck={false}
+          />
+        </div>
 
-              {!d.gated && d.remediation && (() => {
-                const rem = d.remediation;
-                return (
-                  <>
-                    {rem.remediation_required && (
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Remediation Required</h4>
-                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                            rem.severity === "CRITICAL" ? "bg-red-500/20 text-red-400" :
-                            rem.severity === "HIGH" ? "bg-orange-500/20 text-orange-400" :
-                            "bg-amber-500/20 text-amber-400"
-                          }`}>
-                            {rem.severity}
-                          </span>
-                        </div>
-                        <div className="space-y-1.5 mb-2">
-                          {rem.steps.map((s: RemediationStep) => (
-                            <div key={s.step} className="flex gap-2">
-                              <span className="text-[8px] font-mono text-amber-500/60 mt-0.5 shrink-0">#{s.step}</span>
-                              <div>
-                                <p className="text-[9px] font-semibold text-amber-300 leading-none">{s.action}</p>
-                                <p className="text-[8px] text-amber-100/50 leading-tight mt-0.5">{s.detail}</p>
-                                <span className={`text-[7px] font-bold uppercase tracking-wider ${
-                                  s.priority === "IMMEDIATE" ? "text-red-400" :
-                                  s.priority === "SHORT_TERM" ? "text-orange-400" : "text-blue-400"
-                                }`}>{s.priority.replace("_", " ")}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-[8px] text-amber-100/40">
-                          Est. fix time: {rem.estimated_fix_time}
-                        </p>
-                      </div>
-                    )}
+        {/* Optional prompt */}
+        <div className="space-y-2">
+          <Label htmlFor="prompt-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            What did you ask the AI to build? <span className="normal-case font-normal text-muted-foreground/60">(optional but improves accuracy)</span>
+          </Label>
+          <Textarea
+            id="prompt-input"
+            data-testid="input-prompt"
+            value={userPrompt}
+            onChange={e => setUserPrompt(e.target.value)}
+            placeholder="e.g. Build a function that charges a user's card and saves the order to the database"
+            className="glass-input text-xs min-h-[60px] resize-y leading-relaxed"
+            spellCheck={false}
+          />
+        </div>
 
-                    {rem.prevention_tips?.length > 0 && (
-                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                        <h4 className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1.5">Prevention Tips</h4>
-                        <ul className="space-y-1">
-                          {rem.prevention_tips.map((tip: string, i: number) => (
-                            <li key={i} className="text-[8px] text-blue-100/50 flex gap-1.5">
-                              <span className="text-blue-400/60 shrink-0">•</span>{tip}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* CTA area */}
+        {freeTrialAvailable && (
+          <Button
+            data-testid="button-free-trial"
+            onClick={() => runAnalysis(true)}
+            disabled={isRunning || !code.trim()}
+            className="w-full h-11 font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30"
+          >
+            {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</> : <><Zap className="mr-2 h-4 w-4" />Analyze Free (One Trial)</>}
+          </Button>
+        )}
 
-        {isLocked ? (
-          <div className="space-y-4">
-            {freeTrialAvailable && (
-              <>
-                <div className="space-y-2 p-3 rounded-lg bg-white/5 border border-white/10">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <Label htmlFor="agentId-free" className="text-xs font-bold text-white">
-                      Your Agent ID
-                    </Label>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    Enter a unique identifier for your AI agent.
-                  </p>
-                  <Input
-                    id="agentId-free"
-                    data-testid="input-agent-id-free"
-                    value={agentId}
-                    onChange={(e) => setAgentId(e.target.value)}
-                    className="glass-input font-mono h-9 text-sm border-emerald-500/30 focus:border-emerald-400"
-                    placeholder="e.g. my-trading-bot-01"
-                  />
-                </div>
+        {paidSessionId && (
+          <Button
+            data-testid="button-analyze"
+            onClick={() => runAnalysis(false)}
+            disabled={isRunning || !code.trim()}
+            className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
+          >
+            {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
+          </Button>
+        )}
 
-                <div className="space-y-1 flex flex-col">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="payload-free" className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
-                      Operation Payload (JSON)
-                    </Label>
-                    {jsonError && (
-                      <span className="text-[9px] text-rose-400 font-medium animate-pulse">
-                        {jsonError}
-                      </span>
-                    )}
-                  </div>
-                  <Textarea
-                    id="payload-free"
-                    data-testid="input-payload-free"
-                    value={payload}
-                    onChange={(e) => setPayload(e.target.value)}
-                    className="glass-input font-mono text-[10px] min-h-[100px] resize-none leading-relaxed"
-                    spellCheck={false}
-                  />
-                </div>
-
-                <button
-                  data-testid="button-free-trial"
-                  onClick={handleFreeRun}
-                  disabled={freeTrialRunning || !agentId.trim()}
-                  className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all text-left w-full group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded bg-emerald-500/20">
-                      <Zap className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-emerald-300 leading-none">Try ASOF Free</h4>
-                      <p className="text-[9px] text-emerald-400/60 mt-1">One free Lite-tier validation with your data</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-emerald-400">
-                      {freeTrialRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : "FREE"}
-                    </span>
-                  </div>
-                </button>
-
-                <div className="flex items-center gap-3 py-1">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-[9px] text-muted-foreground uppercase tracking-widest">or pay for more</span>
-                  <div className="flex-1 h-px bg-white/10" />
-                </div>
-              </>
-            )}
+        {!freeTrialAvailable && !paidSessionId && freeTrialAvailable !== null && (
+          <div className="space-y-2">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Select Pricing Tier</p>
-            <div className="grid grid-cols-1 gap-2">
-              {tiers.map((tier) => (
-                <button
-                  key={tier.id}
-                  onClick={() => initiatePayment(tier.id)}
-                  className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left w-full group"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded bg-${tier.color}-500/10`}>
-                      {tier.icon}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-white leading-none">{tier.name}</h4>
-                      <p className="text-[9px] text-muted-foreground mt-1">{tier.description}</p>
-                    </div>
+            {tiers.map(tier => (
+              <button
+                key={tier.id}
+                data-testid={`button-tier-${tier.id}`}
+                onClick={() => initiatePayment(tier.id)}
+                className="flex items-center justify-between w-full p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-white/10">{tier.icon}</div>
+                  <div>
+                    <p className="text-xs font-bold text-white">{tier.name}</p>
+                    <p className="text-[9px] text-muted-foreground">{tier.description}</p>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-white">{tier.price}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-            
-            <div className="mt-4 glass-card rounded-lg overflow-hidden border border-white/5 bg-black/20">
-              <table className="w-full text-[8px] text-left leading-tight">
-                <thead className="uppercase tracking-wider text-muted-foreground bg-white/5">
-                  <tr>
-                    <th className="px-2 py-1">Feature</th>
-                    <th className="px-1 py-1 text-center text-emerald-400">L</th>
-                    <th className="px-1 py-1 text-center text-blue-400">P</th>
-                    <th className="px-1 py-1 text-center text-purple-400">M</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Verdict + Confidence</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                  </tr>
-                  <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Explanation</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                  </tr>
-                  <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Evidence</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                  </tr>
-                  <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Remediation</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                    <td className="px-1 py-1 text-center">✅</td>
-                  </tr>
-                  <tr>
-                    <td className="px-2 py-1 text-muted-foreground">CRITICAL Access</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center text-purple-400 font-bold">✅</td>
-                  </tr>
-                  <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Full Remediation Plan</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center text-purple-400 font-bold">✅</td>
-                  </tr>
-                  <tr>
-                    <td className="px-2 py-1 text-muted-foreground">Conflict Detection</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center">❌</td>
-                    <td className="px-1 py-1 text-center text-purple-400 font-bold">✅</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+                </div>
+                <span className="text-xs font-bold text-white">{tier.price}</span>
+              </button>
+            ))}
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 flex-1 flex flex-col">
-            <div className="space-y-2 p-3 rounded-lg bg-white/5 border border-white/10">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <Label htmlFor="agentId" className="text-xs font-bold text-white">
-                  Your Agent ID
-                </Label>
-              </div>
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                Enter a unique identifier for your AI agent. This helps you track your automation history.
-              </p>
-              <Input
-                id="agentId"
-                data-testid="input-agent-id"
-                value={agentId}
-                onChange={(e) => setAgentId(e.target.value)}
-                className="glass-input font-mono h-9 text-sm border-primary/30 focus:border-primary"
-                placeholder="e.g. my-trading-bot-01"
-                required
-              />
-            </div>
+        )}
 
-            <div className="space-y-1 flex-1 flex flex-col">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="payload" className="text-[10px] font-medium uppercase text-muted-foreground tracking-wider">
-                  Operation Payload (JSON)
-                </Label>
-                {jsonError && (
-                  <span className="text-[9px] text-rose-400 font-medium animate-pulse">
-                    {jsonError}
+        {freeTrialAvailable && (
+          <div className="flex items-center gap-3 py-1">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-[9px] text-muted-foreground uppercase tracking-widest">or pay for deeper analysis</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
+        )}
+
+        {freeTrialAvailable && tiers.map(tier => (
+          <button
+            key={tier.id}
+            data-testid={`button-tier-${tier.id}`}
+            onClick={() => initiatePayment(tier.id)}
+            className="flex items-center justify-between w-full p-2.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left"
+          >
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded bg-white/5">{tier.icon}</div>
+              <div>
+                <p className="text-[10px] font-bold text-white">{tier.name} — {tier.price}</p>
+                <p className="text-[9px] text-muted-foreground">{tier.unlocks.join(' · ')}</p>
+              </div>
+            </div>
+          </button>
+        ))}
+
+        {/* Results */}
+        <AnimatePresence>
+          {result && risk && (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="space-y-4 mt-2"
+            >
+              {/* Risk badge + summary */}
+              <div className={`rounded-xl border p-4 space-y-2 ${risk.bg}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {risk.icon}
+                    <span className={`font-bold text-sm ${risk.color}`}>{risk.label}</span>
+                  </div>
+                  <button
+                    data-testid="button-download-pdf"
+                    onClick={() => downloadReport(result, code)}
+                    className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground hover:text-white transition-colors px-2 py-1 rounded border border-white/10 hover:border-white/20 bg-white/5"
+                  >
+                    <Download className="w-3 h-3" />
+                    PDF
+                  </button>
+                </div>
+                <p className="text-xs text-white/80 leading-relaxed">{result.summary}</p>
+                {result.tier && (
+                  <span className="inline-block text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">
+                    {result.tier} tier
                   </span>
                 )}
               </div>
-              <Textarea
-                id="payload"
-                value={payload}
-                onChange={(e) => setPayload(e.target.value)}
-                className="glass-input font-mono text-[10px] flex-1 min-h-[150px] resize-none leading-relaxed"
-                spellCheck={false}
-              />
-            </div>
 
-            <Button 
-              type="submit" 
-              disabled={isRunning}
-              className="w-full h-10 text-sm font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300"
-            >
-              {isRunning ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4 fill-current" />
-                  Execute Sequence
-                </>
+              {/* What the AI assumed */}
+              {result.assumptions?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🔍 What the AI assumed</p>
+                  {result.assumptions.map((a, i) => (
+                    <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/15">
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase ${SEV_COLOR[a.severity]}`}>{a.severity}</span>
+                      <p className="text-xs text-white/75 leading-relaxed">{a.text}</p>
+                    </div>
+                  ))}
+                </div>
               )}
-            </Button>
-          </form>
-        )}
 
+              {/* What could break */}
+              {result.risks?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">💥 What could break</p>
+                  {result.risks.map((r, i) => (
+                    <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/15">
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase ${SEV_COLOR[r.severity]}`}>{r.severity}</span>
+                      <p className="text-xs text-white/75 leading-relaxed">{r.text}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* What to verify */}
+              {result.checks?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">✅ What to verify</p>
+                  <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 space-y-1.5">
+                    {result.checks.map((c, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-amber-500/60 shrink-0 mt-0.5">□</span>
+                        <p className="text-xs text-white/75 leading-relaxed">{c}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Suggestion cards */}
+              {result.suggestions?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🛠 Suggestions</p>
+                  {result.suggestions.map((s, i) => (
+                    <div key={i} className="p-3 rounded-lg bg-white/5 border border-white/10 space-y-1.5">
+                      <p className="text-xs font-bold text-white">{s.problem}</p>
+                      <p className="text-[10px] text-red-300/70 leading-snug"><span className="font-semibold text-red-400/90">Why it matters:</span> {s.why_it_matters}</p>
+                      <p className="text-[10px] text-emerald-300/70 leading-snug"><span className="font-semibold text-emerald-400/90">Fix:</span> {s.fix}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Side-by-side code diff */}
+              {result.safer_code && (
+                <div className="space-y-2">
+                  <button
+                    data-testid="button-toggle-code"
+                    onClick={() => setShowSaferCode(v => !v)}
+                    className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary/80 transition-colors"
+                  >
+                    {showSaferCode ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    🚦 Safer suggested code
+                  </button>
+                  <AnimatePresence>
+                    {showSaferCode && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-1">Original AI Code</p>
+                            <pre className="text-[9px] font-mono leading-relaxed bg-white/5 border border-white/10 rounded-lg p-3 overflow-x-auto text-white/60 whitespace-pre-wrap break-all">{code}</pre>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 px-1">Safer Suggested Code</p>
+                            <pre className="text-[9px] font-mono leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 overflow-x-auto text-emerald-100/80 whitespace-pre-wrap break-all">{result.safer_code}</pre>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+
+              {/* Gated upgrade prompt */}
+              {result.gated && (
+                <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-purple-400" />
+                    <p className="text-xs font-bold text-purple-300">
+                      Upgrade to {result.gated_tier?.toUpperCase()} for{' '}
+                      {result.gated_tier === 'lite' ? 'the full assumption list and what could break' :
+                       result.gated_tier === 'pro' ? 'the verify checklist and detailed suggestion cards' :
+                       'the safer code rewrite side-by-side'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {tiers.filter(t => {
+                      const order = { lite: 0, pro: 1, max: 2 };
+                      return order[t.id] >= order[result.gated_tier as keyof typeof order];
+                    }).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => initiatePayment(t.id)}
+                        className="text-[10px] font-bold px-3 py-1.5 rounded border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all"
+                      >
+                        {t.name} — {t.price}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </CardContent>
     </Card>
   );

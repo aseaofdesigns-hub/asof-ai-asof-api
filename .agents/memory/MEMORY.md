@@ -1,0 +1,2 @@
+- [OpenAI integration](openai-integration.md) — uses Replit AI Integrations (no API key needed); env vars AI_INTEGRATIONS_OPENAI_API_KEY and AI_INTEGRATIONS_OPENAI_BASE_URL
+- [Code analysis endpoint](code-analysis-endpoint.md) — /api/analyze-code uses gpt-5.4 with JSON response_format; tier gating returns subsets of analysis

@@ -14,6 +14,25 @@ export const errorSchemas = {
   }),
 };
 
+export const codeAnalysisResultSchema = z.object({
+  risk_level: z.enum(['SAFE', 'NEEDS_REVIEW', 'RISKY', 'CRITICAL']),
+  summary: z.string(),
+  assumptions: z.array(z.object({ text: z.string(), severity: z.enum(['LOW', 'MEDIUM', 'HIGH']) })),
+  risks: z.array(z.object({ text: z.string(), severity: z.enum(['LOW', 'MEDIUM', 'HIGH']) })).optional(),
+  checks: z.array(z.string()).optional(),
+  safer_code: z.string().optional(),
+  suggestions: z.array(z.object({
+    problem: z.string(),
+    why_it_matters: z.string(),
+    fix: z.string(),
+  })).optional(),
+  gated: z.boolean().optional(),
+  gated_tier: z.string().optional(),
+  tier: z.string().optional(),
+});
+
+export type CodeAnalysisResult = z.infer<typeof codeAnalysisResultSchema>;
+
 export const api = {
   payments: {
     create: {

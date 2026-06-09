@@ -6,8 +6,15 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { getUncachableStripeClient } from "./stripeClient";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { db } from "./db";
+import { freeTrials } from "@shared/schema";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 type AsOfSignal = {
   source?: string;
@@ -1061,6 +1068,147 @@ export async function registerRoutes(
       });
     } catch (err) {
       res.status(500).json({ message: "Failed to create monitor" });
+    }
+  });
+
+  // ── AI-powered code analysis ──────────────────────────────────────────────
+  app.post('/api/analyze-code', async (req, res) => {
+    try {
+      const { code, prompt: userPrompt, sessionId, fingerprint, tier: explicitTier } = req.body;
+
+      if (!code || typeof code !== 'string' || code.trim().length < 10) {
+        return res.status(400).json({ message: "Please paste at least 10 characters of code to analyze." });
+      }
+      if (code.length > 20000) {
+        return res.status(400).json({ message: "Code is too long. Please paste 20,000 characters or fewer." });
+      }
+
+      // Determine tier
+      let tier: 'free' | 'lite' | 'pro' | 'max' = 'free';
+      if (sessionId) {
+        const payment = await storage.getPaymentBySessionId(sessionId);
+        if (payment && payment.status === 'paid') {
+          tier = (payment.tier as any) ?? 'lite';
+        } else {
+          return res.status(401).json({ message: "Payment session not found or not paid." });
+        }
+      } else if (fingerprint) {
+        const trial = await db.select().from(freeTrials).where(eq(freeTrials.fingerprint, fingerprint));
+        if (trial.length > 0) {
+          return res.status(402).json({ message: "Your free trial has already been used.", trial_exhausted: true });
+        }
+        tier = 'free';
+      } else {
+        return res.status(401).json({ message: "Payment required. Please select a tier to continue." });
+      }
+
+      // Build OpenAI prompt
+      const systemPrompt = `You are ASOF — an AI code auditor. Your job is to find hidden assumptions in AI-generated code.
+
+When given code (and optionally the original prompt that produced it), you identify:
+1. What the AI silently assumed without being told
+2. What could break because of those assumptions  
+3. What the developer should verify before trusting or shipping the code
+4. A safer, improved version of the code with better error handling and safety checks
+
+ALWAYS respond with valid JSON matching exactly this structure:
+{
+  "risk_level": "SAFE" | "NEEDS_REVIEW" | "RISKY" | "CRITICAL",
+  "summary": "1-2 sentences describing the most important concern",
+  "assumptions": [
+    { "text": "The AI assumed X", "severity": "LOW" | "MEDIUM" | "HIGH" }
+  ],
+  "risks": [
+    { "text": "What could fail or go wrong", "severity": "LOW" | "MEDIUM" | "HIGH" }
+  ],
+  "checks": [
+    "Specific thing to verify before using this code"
+  ],
+  "safer_code": "The full improved code with assumptions made explicit, better validation, and error handling. Keep the same language and style.",
+  "suggestions": [
+    {
+      "problem": "Short name for the issue",
+      "why_it_matters": "Why this is dangerous or problematic",
+      "fix": "Concrete change to make it safe"
+    }
+  ]
+}
+
+Be specific and concrete. Avoid vague warnings. Reference actual variable names, function names, and lines from the code.`;
+
+      const userMessage = userPrompt
+        ? `Original prompt: "${userPrompt}"\n\nAI-generated code:\n\`\`\`\n${code}\n\`\`\``
+        : `AI-generated code:\n\`\`\`\n${code}\n\`\`\``;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5.4",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 4096,
+      });
+
+      const raw = completion.choices[0]?.message?.content ?? '{}';
+      let analysis: any;
+      try {
+        analysis = JSON.parse(raw);
+      } catch {
+        return res.status(500).json({ message: "AI returned invalid JSON. Please try again." });
+      }
+
+      // Record free trial usage
+      if (tier === 'free' && fingerprint) {
+        await db.insert(freeTrials).values({ fingerprint });
+      }
+
+      // Gate results by tier
+      const base = {
+        risk_level: analysis.risk_level ?? 'NEEDS_REVIEW',
+        summary: analysis.summary ?? '',
+        assumptions: analysis.assumptions ?? [],
+        tier,
+      };
+
+      if (tier === 'free') {
+        return res.json({
+          ...base,
+          assumptions: (analysis.assumptions ?? []).slice(0, 2),
+          gated: true,
+          gated_tier: 'lite',
+        });
+      }
+      if (tier === 'lite') {
+        return res.json({
+          ...base,
+          risks: analysis.risks ?? [],
+          gated: true,
+          gated_tier: 'pro',
+        });
+      }
+      if (tier === 'pro') {
+        return res.json({
+          ...base,
+          risks: analysis.risks ?? [],
+          checks: analysis.checks ?? [],
+          suggestions: analysis.suggestions ?? [],
+          gated: true,
+          gated_tier: 'max',
+        });
+      }
+      // max — full access
+      return res.json({
+        ...base,
+        risks: analysis.risks ?? [],
+        checks: analysis.checks ?? [],
+        safer_code: analysis.safer_code ?? '',
+        suggestions: analysis.suggestions ?? [],
+        gated: false,
+      });
+    } catch (err: any) {
+      console.error("analyze-code error:", err);
+      res.status(500).json({ message: err?.message ?? "Analysis failed." });
     }
   });
 
