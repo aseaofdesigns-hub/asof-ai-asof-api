@@ -9,6 +9,124 @@ import { useToast } from "@/hooks/use-toast";
 import type { CodeAnalysisResult } from "@shared/routes";
 import jsPDF from "jspdf";
 
+const DEMO_CODE = `// AI-generated: charge customer and save order
+async function processOrder(userId, cartItems) {
+  const total = cartItems.reduce((sum, item) => sum + item.price, 0);
+
+  const charge = await stripe.charges.create({
+    amount: total,
+    currency: 'usd',
+    customer: userId,
+    description: 'Order payment'
+  });
+
+  const order = await db.orders.create({
+    userId: userId,
+    items: cartItems,
+    total: total,
+    stripeChargeId: charge.id,
+    status: 'paid'
+  });
+
+  return order;
+}`;
+
+const DEMO_PROMPT = "Build a function that charges a customer's card and saves their order to the database";
+
+const DEMO_RESULT: CodeAnalysisResult = {
+  risk_level: "RISKY",
+  summary: "This function charges the customer using userId as a Stripe customer ID without verifying it exists, and treats item.price as already being in cents — if prices are stored in dollars, customers will be overcharged by 100×. A DB failure after a successful charge will silently lose money.",
+  tier: "max (demo)",
+  assumptions: [
+    { text: "The AI assumed userId is a valid Stripe customer ID — it may be an internal DB user ID, which will cause a Stripe error or charge the wrong customer.", severity: "HIGH" },
+    { text: "The AI assumed item.price is already in cents. If your app stores prices in dollars (e.g. 29.99), Stripe will charge $2,999.", severity: "HIGH" },
+    { text: "The AI assumed no duplicate order protection is needed — a network retry or double-click will create two charges.", severity: "MEDIUM" },
+    { text: "The AI assumed the charge always succeeds before the DB insert — there is no rollback if the database fails after money is taken.", severity: "HIGH" },
+  ],
+  risks: [
+    { text: "100× overcharge if item.price is in dollars instead of cents — Stripe receives the raw float as cents.", severity: "HIGH" },
+    { text: "Orphaned charge: if db.orders.create throws, Stripe has the money but no order exists in your system.", severity: "HIGH" },
+    { text: "Double-charge on retry: no Stripe idempotency key means a network timeout retry creates a second charge.", severity: "MEDIUM" },
+    { text: "No authorization check — any userId can be passed in, so one user could trigger a charge on another user's saved card.", severity: "HIGH" },
+  ],
+  checks: [
+    "Confirm item.price unit: is it dollars or cents? Multiply by 100 if dollars before passing to Stripe.",
+    "Verify userId is a Stripe customer ID (starts with 'cus_'), not an internal user ID.",
+    "Add a Stripe idempotency key (e.g. based on cart hash + userId) to prevent double-charging on retry.",
+    "Wrap the charge + DB insert in a try/catch that issues a Stripe refund if the DB insert fails.",
+    "Add an ownership check to confirm the userId matches the authenticated session before charging.",
+  ],
+  suggestions: [
+    {
+      problem: "Prices may not be in cents",
+      why_it_matters: "Stripe requires amounts in the smallest currency unit (cents). If item.price is 29.99 dollars, Stripe charges $2,999.",
+      fix: "Multiply by 100: amount: Math.round(total * 100) — or store prices in cents throughout your app.",
+    },
+    {
+      problem: "No idempotency key on Stripe charge",
+      why_it_matters: "If the request times out and retries, Stripe creates a second charge. The customer gets billed twice.",
+      fix: "Add idempotencyKey: { idempotencyKey: `order-${userId}-${cartHash}` } to the stripe.charges.create call.",
+    },
+    {
+      problem: "No rollback if DB insert fails after charge",
+      why_it_matters: "Stripe takes the money, then if db.orders.create throws, the order is never recorded. You have a payment with no order.",
+      fix: "Wrap both calls in try/catch. If the DB insert fails, call stripe.refunds.create({ charge: charge.id }) before rethrowing.",
+    },
+    {
+      problem: "Missing authorization check",
+      why_it_matters: "Nothing confirms the caller owns the userId being charged. A logged-in user could pass someone else's userId.",
+      fix: "Compare userId to the authenticated session user ID before processing: if (userId !== req.user.id) throw new Error('Unauthorized').",
+    },
+  ],
+  safer_code: `// Safer version: explicit cents conversion, idempotency, rollback, auth check
+async function processOrder(authenticatedUserId, cartItems) {
+  // 1. Authorization: only charge the authenticated user
+  if (!authenticatedUserId) throw new Error('Unauthorized: no authenticated user');
+
+  // 2. Look up the Stripe customer ID — never use internal user IDs directly
+  const user = await db.users.findById(authenticatedUserId);
+  if (!user?.stripeCustomerId) throw new Error('No payment method on file');
+
+  // 3. Convert prices to cents explicitly (assumes item.price is in dollars)
+  const totalCents = Math.round(
+    cartItems.reduce((sum, item) => sum + item.price, 0) * 100
+  );
+
+  // 4. Create a stable idempotency key to prevent double-charges on retry
+  const cartHash = cartItems.map(i => i.id + ':' + i.qty).join(',');
+  const idempotencyKey = \`order-\${authenticatedUserId}-\${Buffer.from(cartHash).toString('base64').slice(0, 16)}\`;
+
+  let charge;
+  try {
+    charge = await stripe.charges.create(
+      { amount: totalCents, currency: 'usd', customer: user.stripeCustomerId, description: 'Order payment' },
+      { idempotencyKey }
+    );
+  } catch (stripeErr) {
+    throw new Error(\`Payment failed: \${stripeErr.message}\`);
+  }
+
+  // 5. Save the order — if this fails, refund the charge
+  let order;
+  try {
+    order = await db.orders.create({
+      userId: authenticatedUserId,
+      items: cartItems,
+      totalCents,
+      stripeChargeId: charge.id,
+      status: 'paid',
+    });
+  } catch (dbErr) {
+    // Rollback: refund the charge so money isn't lost
+    await stripe.refunds.create({ charge: charge.id });
+    throw new Error('Order could not be saved; payment has been refunded.');
+  }
+
+  return order;
+}`,
+  gated: false,
+};
+
 function getFingerprint(): string {
   let fp = localStorage.getItem("asof_fp");
   if (!fp) {
@@ -117,11 +235,19 @@ export function RunAutomationForm() {
   const [userPrompt, setUserPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<CodeAnalysisResult | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
   const [freeTrialAvailable, setFreeTrialAvailable] = useState<boolean | null>(null);
-  const [selectedTier, setSelectedTier] = useState<'lite' | 'pro' | 'max' | null>(null);
   const [showSaferCode, setShowSaferCode] = useState(false);
   const { toast } = useToast();
+
+  const loadDemo = () => {
+    setCode(DEMO_CODE);
+    setUserPrompt(DEMO_PROMPT);
+    setResult(DEMO_RESULT);
+    setIsDemo(true);
+    setShowSaferCode(true);
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("stripe_session_id");
@@ -160,6 +286,7 @@ export function RunAutomationForm() {
     }
     setIsRunning(true);
     setResult(null);
+    setIsDemo(false);
     setShowSaferCode(false);
     try {
       const body: any = { code, prompt: userPrompt || undefined };
@@ -203,9 +330,18 @@ export function RunAutomationForm() {
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500" />
 
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Code2 className="w-5 h-5 text-primary" />
-          Analyze AI-Generated Code
+        <CardTitle className="flex items-center justify-between text-lg">
+          <div className="flex items-center gap-2">
+            <Code2 className="w-5 h-5 text-primary" />
+            Analyze AI-Generated Code
+          </div>
+          <button
+            data-testid="button-load-demo"
+            onClick={loadDemo}
+            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+          >
+            ✨ Try an example
+          </button>
         </CardTitle>
         <p className="text-xs text-muted-foreground">Paste code from Cursor, Claude, ChatGPT, or any AI tool. ASOF finds what it assumed.</p>
       </CardHeader>
@@ -324,6 +460,14 @@ export function RunAutomationForm() {
               exit={{ opacity: 0 }}
               className="space-y-4 mt-2"
             >
+              {/* Demo banner */}
+              {isDemo && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-[10px]">
+                  <span className="text-primary font-bold uppercase tracking-wider">✨ Example analysis — paste your own code above to run a real check</span>
+                  <button onClick={() => { setResult(null); setIsDemo(false); setCode(""); setUserPrompt(""); }} className="text-primary/60 hover:text-primary transition-colors font-semibold">Clear</button>
+                </div>
+              )}
+
               {/* Risk badge + summary */}
               <div className={`rounded-xl border p-4 space-y-2 ${risk.bg}`}>
                 <div className="flex items-center justify-between">
