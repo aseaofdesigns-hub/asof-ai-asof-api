@@ -865,6 +865,11 @@ export async function registerRoutes(
 
       if (session.payment_status === 'paid') {
         await storage.updatePaymentStatus(sessionId, 'paid');
+        // Capture customer email from Stripe for recovery
+        const email = session.customer_details?.email ?? (session as any).customer_email ?? null;
+        if (email) {
+          await storage.updatePaymentEmail(sessionId, email.toLowerCase().trim());
+        }
         // If this is an upgrade payment, bump the analysis tier in place
         if (payment?.analysisId) {
           await storage.upgradeAnalysisTier(payment.analysisId, payment.tier);
@@ -1270,6 +1275,20 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
     } catch (err: any) {
       console.error("analyze-code error:", err);
       res.status(500).json({ message: err?.message ?? "Analysis failed." });
+    }
+  });
+
+  // ── POST /api/recover-sessions — restore unused paid sessions by email ──
+  app.post('/api/recover-sessions', async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== 'string') return res.status(400).json({ message: "Email required" });
+      const allPayments = await storage.getUnconsumedPaymentsByEmail(email.toLowerCase().trim());
+      const recoverable = allPayments.filter(p => p.status === 'paid' && !p.consumed && !p.analysisId);
+      const sessions = recoverable.map(p => ({ id: p.stripeSessionId, tier: p.tier }));
+      res.json({ sessions, count: sessions.length });
+    } catch {
+      res.status(500).json({ message: "Recovery failed" });
     }
   });
 

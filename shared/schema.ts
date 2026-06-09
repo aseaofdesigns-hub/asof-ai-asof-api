@@ -39,6 +39,7 @@ export const payments = pgTable("payments", {
   tier: text("tier").notNull().default("lite"),
   consumed: boolean("consumed").notNull().default(false),
   analysisId: integer("analysis_id"),
+  customerEmail: text("customer_email"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -8,6 +8,8 @@ export interface IStorage {
   createPayment(payment: { stripeSessionId: string, amount: number, tier: string, analysisId?: number }): Promise<Payment>;
   getPaymentBySessionId(sessionId: string): Promise<Payment | undefined>;
   updatePaymentStatus(sessionId: string, status: string): Promise<Payment>;
+  updatePaymentEmail(sessionId: string, email: string): Promise<void>;
+  getUnconsumedPaymentsByEmail(email: string): Promise<Payment[]>;
   markSessionConsumed(sessionId: string): Promise<Payment>;
   hasUsedFreeTrial(fingerprint: string): Promise<boolean>;
   markFreeTrialUsed(fingerprint: string): Promise<void>;
@@ -49,6 +51,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(payments.stripeSessionId, sessionId))
       .returning();
     return payment;
+  }
+
+  async updatePaymentEmail(sessionId: string, email: string): Promise<void> {
+    await db.update(payments)
+      .set({ customerEmail: email })
+      .where(eq(payments.stripeSessionId, sessionId));
+  }
+
+  async getUnconsumedPaymentsByEmail(email: string): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.customerEmail, email.toLowerCase().trim()));
   }
 
   async markSessionConsumed(sessionId: string): Promise<Payment> {

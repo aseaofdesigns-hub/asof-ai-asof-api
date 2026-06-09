@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, ChevronDown, ChevronUp, Sparkles, Eye, ArrowUpCircle } from "lucide-react";
+import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, ChevronDown, ChevronUp, Sparkles, Eye, ArrowUpCircle, MailSearch } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import type { CodeAnalysisResult } from "@shared/routes";
@@ -216,7 +217,44 @@ export function RunAutomationForm() {
   const [showSaferCode, setShowSaferCode] = useState(false);
   const [showExampleResult, setShowExampleResult] = useState(false);
   const [isExampleLoaded, setIsExampleLoaded] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [isRecovering, setIsRecovering] = useState(false);
+  const recoveryInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  async function recoverSessions() {
+    if (!recoveryEmail.trim()) return;
+    setIsRecovering(true);
+    try {
+      const res = await fetch('/api/recover-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: recoveryEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      if (data.count === 0) {
+        toast({ title: "No credits found", description: "No unused paid credits found for that email.", variant: "destructive" });
+      } else {
+        const raw = localStorage.getItem("asof_sessions");
+        const existing: Array<{ id: string; tier: string }> = raw ? JSON.parse(raw) : [];
+        const existingIds = new Set(existing.map((s: any) => s.id));
+        const newSessions = data.sessions.filter((s: any) => !existingIds.has(s.id));
+        const merged = [...existing, ...newSessions];
+        localStorage.setItem("asof_sessions", JSON.stringify(merged));
+        if (merged.length > 0) localStorage.setItem("stripe_session_id", merged[0].id);
+        setSessions(merged);
+        setShowRecovery(false);
+        setRecoveryEmail("");
+        toast({ title: `${data.count} credit${data.count > 1 ? 's' : ''} restored!`, description: "Your paid sessions are ready to use." });
+      }
+    } catch (err) {
+      toast({ title: "Recovery failed", description: err instanceof Error ? err.message : "Try again", variant: "destructive" });
+    } finally {
+      setIsRecovering(false);
+    }
+  }
 
   // Derived: first queued session (backward compat with existing render logic)
   const paidSessionId = sessions[0]?.id ?? null;
@@ -547,6 +585,52 @@ export function RunAutomationForm() {
           </div>
         )}
 
+        {/* Credit recovery */}
+        {!paidSessionId && freeTrialAvailable === false && (
+          <div className="text-center">
+            <button
+              data-testid="button-recover-credits"
+              onClick={() => { setShowRecovery(v => !v); setTimeout(() => recoveryInputRef.current?.focus(), 50); }}
+              className="text-[10px] text-muted-foreground hover:text-primary transition-colors underline underline-offset-2"
+            >
+              Already paid? Recover your credits →
+            </button>
+            <AnimatePresence>
+              {showRecovery && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden mt-3"
+                >
+                  <div className="flex gap-2 items-center p-3 rounded-xl bg-white/5 border border-white/10">
+                    <MailSearch className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <Input
+                      ref={recoveryInputRef}
+                      data-testid="input-recovery-email"
+                      type="email"
+                      placeholder="Enter the email you used at checkout"
+                      value={recoveryEmail}
+                      onChange={e => setRecoveryEmail(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && recoverSessions()}
+                      className="glass-input text-xs h-8 flex-1"
+                    />
+                    <Button
+                      data-testid="button-recover-submit"
+                      size="sm"
+                      onClick={recoverSessions}
+                      disabled={isRecovering || !recoveryEmail.trim()}
+                      className="text-xs h-8 px-3 shrink-0"
+                    >
+                      {isRecovering ? <Loader2 className="w-3 h-3 animate-spin" /> : "Restore"}
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         {!freeTrialAvailable && !paidSessionId && freeTrialAvailable !== null && (
           <div className="space-y-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Select Pricing Tier</p>
@@ -661,14 +745,30 @@ export function RunAutomationForm() {
                     {risk.icon}
                     <span className={`font-bold text-sm ${risk.color}`}>{risk.label}</span>
                   </div>
-                  <button
-                    data-testid="button-download-pdf"
-                    onClick={() => downloadReport(result, code)}
-                    className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground hover:text-white transition-colors px-2 py-1 rounded border border-white/10 hover:border-white/20 bg-white/5"
-                  >
-                    <Download className="w-3 h-3" />
-                    PDF
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* Score pill */}
+                    {(() => {
+                      const scoreMap: Record<string, number> = { SAFE: 90, NEEDS_REVIEW: 62, RISKY: 32, CRITICAL: 10 };
+                      const score = scoreMap[result.risk_level] ?? 50;
+                      const color = score > 80 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+                        : score > 55 ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
+                        : score > 25 ? "text-orange-400 bg-orange-500/10 border-orange-500/30"
+                        : "text-red-400 bg-red-500/10 border-red-500/30";
+                      return (
+                        <span data-testid="text-risk-score" className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded border ${color}`}>
+                          {score}% safe
+                        </span>
+                      );
+                    })()}
+                    <button
+                      data-testid="button-download-pdf"
+                      onClick={() => downloadReport(result, code)}
+                      className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground hover:text-white transition-colors px-2 py-1 rounded border border-white/10 hover:border-white/20 bg-white/5"
+                    >
+                      <Download className="w-3 h-3" />
+                      PDF
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-white/80 leading-relaxed">{result.summary}</p>
                 {result.tier && (
