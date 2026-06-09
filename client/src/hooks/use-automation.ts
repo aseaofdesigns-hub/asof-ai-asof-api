@@ -18,7 +18,7 @@ function getOwnerParams(): string {
 
 export function useCodeAnalyses() {
   return useQuery<CodeAnalysis[]>({
-    queryKey: ['/api/code-analyses', typeof window !== 'undefined' ? localStorage.getItem("asof_fp") : null, typeof window !== 'undefined' ? localStorage.getItem("stripe_session_id") : null],
+    queryKey: ['/api/code-analyses'],
     queryFn: async () => {
       const qs = getOwnerParams();
       if (!qs) return [];

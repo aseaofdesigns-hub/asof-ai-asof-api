@@ -8,6 +8,7 @@ import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XC
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import type { CodeAnalysisResult } from "@shared/routes";
 import jsPDF from "jspdf";
 
@@ -444,6 +445,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string) 
 }
 
 export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalysisResult, code: string) => void }) {
+  const queryClient = useQueryClient();
   const [code, setCode] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -528,6 +530,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         setResult(data);
         setAnalysisId(id);
         onResult?.(data, code);
+        void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
         toast({ title: "Analysis loaded", description: `Upgraded to ${data.tier?.toUpperCase() ?? 'new tier'}` });
       }
     } catch {}
@@ -624,6 +627,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       if (asFree) setFreeTrialAvailable(false);
       if (paidSessionId && !asFree) consumeSession(paidSessionId);
       onResult?.(data, code);
+      void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
       toast({ title: "Analysis complete", description: `Risk level: ${data.risk_level?.replace("_", " ")}` });
     } catch (err) {
       toast({ title: "Analysis failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
