@@ -9,12 +9,12 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 const RISK_CONFIG = {
   SAFE: { label: "SAFE", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
   NEEDS_REVIEW: { label: "NEEDS REVIEW", className: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  RISKY: { label: "RISKY", className: "bg-orange-500/15 text-orange-400 border-amber-500/30" },
+  RISKY: { label: "RISKY", className: "bg-orange-500/15 text-orange-400 border-orange-500/30" },
   CRITICAL: { label: "CRITICAL", className: "bg-rose-500/15 text-rose-400 border-rose-500/30" },
 } as const;
 
@@ -35,7 +35,11 @@ function confidenceToRisk(confidence: number): string {
   return "CRITICAL";
 }
 
-export function SignalsTable() {
+interface SignalsTableProps {
+  riskFilter?: string | null;
+}
+
+export function SignalsTable({ riskFilter }: SignalsTableProps) {
   const { data: analyses, isLoading: analysesLoading } = useCodeAnalyses();
   const { data: signals, isLoading: signalsLoading } = useSignals();
 
@@ -43,7 +47,7 @@ export function SignalsTable() {
 
   if (isLoading) {
     return (
-      <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+      <div className="h-[200px] flex items-center justify-center text-muted-foreground">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -54,16 +58,30 @@ export function SignalsTable() {
 
   if (!hasAnalyses && !hasSignals) {
     return (
-      <div className="h-[400px] flex flex-col items-center justify-center text-muted-foreground gap-4">
+      <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground gap-4">
         <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
           <ActivityIcon className="w-8 h-8 opacity-50" />
         </div>
-        <p>No analyses yet — run your first analysis above</p>
+        <p className="text-sm">No analyses yet — run your first analysis above</p>
       </div>
     );
   }
 
   if (hasAnalyses) {
+    const filtered = riskFilter
+      ? analyses!.filter(a => a.riskLevel === riskFilter)
+      : analyses!;
+
+    if (filtered.length === 0) {
+      return (
+        <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground gap-2">
+          <ActivityIcon className="w-8 h-8 opacity-40" />
+          <p className="text-sm">No <span className="font-semibold">{riskFilter?.replace("_", " ")}</span> analyses found</p>
+          <p className="text-xs opacity-60">Try a different filter or run more analyses</p>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-xl border border-white/10 overflow-hidden bg-secondary/20">
         <Table>
@@ -77,7 +95,7 @@ export function SignalsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {analyses!.map((analysis) => {
+            {filtered.map((analysis) => {
               const config = RISK_CONFIG[analysis.riskLevel as keyof typeof RISK_CONFIG] ?? RISK_CONFIG.NEEDS_REVIEW;
               const score = riskToScore(analysis.riskLevel);
               return (
@@ -118,6 +136,20 @@ export function SignalsTable() {
     );
   }
 
+  // Fallback: show signals data (historical)
+  const filteredSignals = riskFilter
+    ? signals!.filter(s => confidenceToRisk(s.confidence) === riskFilter)
+    : signals!;
+
+  if (filteredSignals.length === 0) {
+    return (
+      <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground gap-2">
+        <ActivityIcon className="w-8 h-8 opacity-40" />
+        <p className="text-sm">No <span className="font-semibold">{riskFilter?.replace("_", " ")}</span> signals found</p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-white/10 overflow-hidden bg-secondary/20">
       <Table>
@@ -130,7 +162,7 @@ export function SignalsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {signals!.map((signal) => {
+          {filteredSignals.map((signal) => {
             const riskLevel = confidenceToRisk(signal.confidence);
             const config = RISK_CONFIG[riskLevel as keyof typeof RISK_CONFIG] ?? RISK_CONFIG.NEEDS_REVIEW;
             return (
