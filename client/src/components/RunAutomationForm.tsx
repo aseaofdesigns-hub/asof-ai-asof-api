@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -515,6 +516,16 @@ export function RunAutomationForm() {
                 <span className="text-xs font-bold text-white">{tier.price}</span>
               </button>
             ))}
+
+            <div className="text-center pt-1">
+              <Link
+                data-testid="link-full-pricing"
+                href="/pricing"
+                className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
+              >
+                View full pricing comparison →
+              </Link>
+            </div>
           </div>
         )}
 
