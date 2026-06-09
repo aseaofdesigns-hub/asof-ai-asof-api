@@ -10,6 +10,7 @@ import Privacy from "@/pages/Privacy";
 import Contact from "@/pages/Contact";
 import ApiDocs from "@/pages/ApiDocs";
 import FAQ from "@/pages/FAQ";
+import Pricing from "@/pages/Pricing";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/contact" component={Contact} />
       <Route path="/docs" component={ApiDocs} />
       <Route path="/faq" component={FAQ} />
+      <Route path="/pricing" component={Pricing} />
       <Route component={NotFound} />
     </Switch>
   );
