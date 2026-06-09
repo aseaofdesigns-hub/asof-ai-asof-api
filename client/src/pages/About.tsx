@@ -160,6 +160,43 @@ export default function About() {
                 </div>
               ))}
             </div>
+
+            {/* Tier structure */}
+            <div className="glass-card p-6 rounded-2xl border border-white/5 space-y-4">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Tier structure — pay only for what you need</p>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {[
+                  {
+                    name: "Lite", price: "$0.50", color: "text-emerald-400", border: "border-emerald-500/20 bg-emerald-500/5",
+                    features: ["Risk verdict", "Full assumption list", "What could break"],
+                  },
+                  {
+                    name: "Pro", price: "$1.00", color: "text-blue-400", border: "border-blue-500/20 bg-blue-500/5",
+                    features: ["Everything in Lite", "Verify checklist", "Suggestion cards"],
+                  },
+                  {
+                    name: "Max", price: "$2.50", color: "text-purple-400", border: "border-purple-500/20 bg-purple-500/5",
+                    features: ["Everything in Pro", "Safer code rewrite", "Side-by-side diff"],
+                  },
+                ].map((t, i) => (
+                  <div key={i} className={`rounded-xl border p-4 space-y-2 ${t.border}`}>
+                    <div className="flex items-baseline justify-between">
+                      <span className={`font-bold text-sm ${t.color}`}>{t.name}</span>
+                      <span className="text-xs text-white/60">{t.price}</span>
+                    </div>
+                    <ul className="space-y-1">
+                      {t.features.map((f, j) => (
+                        <li key={j} className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                          <span className={`w-1 h-1 rounded-full shrink-0 ${t.color.replace("text-", "bg-")}`} />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground text-center">One free Lite-tier trial per device — no payment required to start.</p>
+            </div>
           </motion.div>
 
           {/* Coming integrations */}

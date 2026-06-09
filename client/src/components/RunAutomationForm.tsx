@@ -403,8 +403,38 @@ export function RunAutomationForm() {
         )}
 
         {!freeTrialAvailable && !paidSessionId && freeTrialAvailable !== null && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Select Pricing Tier</p>
+
+            {/* Feature comparison table */}
+            <div className="rounded-xl border border-white/10 overflow-hidden text-[9px]">
+              <div className="grid grid-cols-4 bg-white/5 border-b border-white/10">
+                <div className="p-2 text-muted-foreground font-semibold uppercase tracking-wider">Feature</div>
+                <div className="p-2 text-center text-emerald-400 font-bold">Lite<br/><span className="text-white/60 font-normal normal-case tracking-normal">$0.50</span></div>
+                <div className="p-2 text-center text-blue-400 font-bold">Pro<br/><span className="text-white/60 font-normal normal-case tracking-normal">$1.00</span></div>
+                <div className="p-2 text-center text-purple-400 font-bold">Max<br/><span className="text-white/60 font-normal normal-case tracking-normal">$2.50</span></div>
+              </div>
+              {[
+                { label: "Verdict (risk level)", lite: true, pro: true, max: true },
+                { label: "Assumptions", lite: true, pro: true, max: true },
+                { label: "What Could Break", lite: true, pro: true, max: true },
+                { label: "Verify Checklist", lite: false, pro: true, max: true },
+                { label: "Suggestion Cards", lite: false, pro: true, max: true },
+                { label: "Safer Code Rewrite", lite: false, pro: false, max: true },
+              ].map((row, i) => (
+                <div key={i} className={`grid grid-cols-4 border-b border-white/5 last:border-0 ${i % 2 === 0 ? "" : "bg-white/[0.02]"}`}>
+                  <div className="p-2 text-muted-foreground">{row.label}</div>
+                  {[row.lite, row.pro, row.max].map((has, j) => (
+                    <div key={j} className="p-2 flex justify-center items-center">
+                      {has
+                        ? <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        : <Lock className="w-3 h-3 text-white/20" />}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
             {tiers.map(tier => (
               <button
                 key={tier.id}

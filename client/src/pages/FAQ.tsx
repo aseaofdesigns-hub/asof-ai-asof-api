@@ -55,6 +55,11 @@ export default function FAQ() {
       answer: "Yes. Just don't complete checkout — nothing runs, nothing charges.",
       icon: <Check className="w-4 h-4 text-emerald-400" />
     },
+    {
+      question: "What does each tier include?",
+      answer: "Every tier gives you a risk verdict and the full assumption list. Lite ($0.50) adds what could break. Pro ($1.00) adds the verify checklist and suggestion cards. Max ($2.50) adds a safer code rewrite side-by-side with your original.",
+      icon: <Check className="w-4 h-4 text-emerald-400" />
+    },
   ];
 
   return (
