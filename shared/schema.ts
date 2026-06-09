@@ -2,6 +2,25 @@ import { pgTable, text, serial, jsonb, real, timestamp, integer, boolean } from 
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const codeAnalyses = pgTable("code_analyses", {
+  id: serial("id").primaryKey(),
+  codeSnippet: text("code_snippet").notNull(),
+  riskLevel: text("risk_level").notNull(),
+  summary: text("summary").notNull(),
+  tier: text("tier").notNull(),
+  fingerprint: text("fingerprint"),
+  sessionId: text("session_id"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const insertCodeAnalysisSchema = createInsertSchema(codeAnalyses).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type CodeAnalysis = typeof codeAnalyses.$inferSelect;
+export type InsertCodeAnalysis = z.infer<typeof insertCodeAnalysisSchema>;
+
 export const signals = pgTable("signals", {
   id: serial("id").primaryKey(),
   agentId: text("agent_id").notNull(),

@@ -2,9 +2,33 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Signal } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import type { CodeAnalysis } from "@shared/schema";
 
 // Validated input type for the run mutation
 type RunAutomationInput = z.infer<typeof api.automation.run.input>;
+
+function getOwnerParams(): string {
+  const params = new URLSearchParams();
+  const fp = localStorage.getItem("asof_fp");
+  if (fp) params.set("fingerprint", fp);
+  const sessionId = localStorage.getItem("stripe_session_id");
+  if (sessionId) params.set("sessionId", sessionId);
+  return params.toString();
+}
+
+export function useCodeAnalyses() {
+  return useQuery<CodeAnalysis[]>({
+    queryKey: ['/api/code-analyses', typeof window !== 'undefined' ? localStorage.getItem("asof_fp") : null, typeof window !== 'undefined' ? localStorage.getItem("stripe_session_id") : null],
+    queryFn: async () => {
+      const qs = getOwnerParams();
+      if (!qs) return [];
+      const res = await fetch(`/api/code-analyses?${qs}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 5000,
+  });
+}
 
 export function useSignals() {
   return useQuery({

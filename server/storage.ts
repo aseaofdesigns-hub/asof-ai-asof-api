@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { signals, payments, freeTrials, type InsertSignal, type Signal, type Payment } from "@shared/schema";
+import { signals, payments, freeTrials, codeAnalyses, type InsertSignal, type Signal, type Payment, type InsertCodeAnalysis, type CodeAnalysis } from "@shared/schema";
 import { desc, eq } from "drizzle-orm";
 
 export interface IStorage {
@@ -11,6 +11,8 @@ export interface IStorage {
   markSessionConsumed(sessionId: string): Promise<Payment>;
   hasUsedFreeTrial(fingerprint: string): Promise<boolean>;
   markFreeTrialUsed(fingerprint: string): Promise<void>;
+  createCodeAnalysis(analysis: InsertCodeAnalysis): Promise<CodeAnalysis>;
+  getCodeAnalyses(filter: { fingerprint?: string; sessionId?: string }): Promise<CodeAnalysis[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -63,6 +65,30 @@ export class DatabaseStorage implements IStorage {
     await db.insert(freeTrials)
       .values({ fingerprint, used: true })
       .onConflictDoUpdate({ target: freeTrials.fingerprint, set: { used: true } });
+  }
+
+  async createCodeAnalysis(analysis: InsertCodeAnalysis): Promise<CodeAnalysis> {
+    const [record] = await db.insert(codeAnalyses).values(analysis).returning();
+    return record;
+  }
+
+  async getCodeAnalyses(filter: { fingerprint?: string; sessionId?: string }): Promise<CodeAnalysis[]> {
+    const { fingerprint, sessionId } = filter;
+    if (!fingerprint && !sessionId) return [];
+    if (fingerprint && sessionId) {
+      const { or } = await import("drizzle-orm");
+      return await db.select().from(codeAnalyses)
+        .where(or(eq(codeAnalyses.fingerprint, fingerprint), eq(codeAnalyses.sessionId, sessionId)))
+        .orderBy(desc(codeAnalyses.timestamp));
+    }
+    if (fingerprint) {
+      return await db.select().from(codeAnalyses)
+        .where(eq(codeAnalyses.fingerprint, fingerprint))
+        .orderBy(desc(codeAnalyses.timestamp));
+    }
+    return await db.select().from(codeAnalyses)
+      .where(eq(codeAnalyses.sessionId, sessionId!))
+      .orderBy(desc(codeAnalyses.timestamp));
   }
 }
 

@@ -1071,6 +1071,23 @@ export async function registerRoutes(
     }
   });
 
+  // ── Code analysis history ─────────────────────────────────────────────────
+  app.get('/api/code-analyses', async (req, res) => {
+    try {
+      const fingerprint = typeof req.query.fingerprint === 'string' ? req.query.fingerprint : undefined;
+      const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
+      if (!fingerprint && !sessionId) {
+        return res.status(400).json({ message: "fingerprint or sessionId required" });
+      }
+      const analyses = await storage.getCodeAnalyses({ fingerprint, sessionId });
+      // Omit codeSnippet from list responses to avoid exposing sensitive code
+      const safe = analyses.map(({ codeSnippet: _omit, ...rest }) => rest);
+      return res.json(safe);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch code analyses." });
+    }
+  });
+
   // ── AI-powered code analysis ──────────────────────────────────────────────
   app.post('/api/analyze-code', async (req, res) => {
     try {
@@ -1162,6 +1179,18 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
       if (tier === 'free' && fingerprint) {
         await db.insert(freeTrials).values({ fingerprint });
       }
+
+      // Save analysis to database (store ownership for scoped retrieval)
+      const riskLevel = analysis.risk_level ?? 'NEEDS_REVIEW';
+      const summary = analysis.summary ?? '';
+      await storage.createCodeAnalysis({
+        codeSnippet: code.slice(0, 500),
+        riskLevel,
+        summary,
+        tier,
+        fingerprint: fingerprint ?? null,
+        sessionId: sessionId ?? null,
+      });
 
       // Gate results by tier
       const base = {

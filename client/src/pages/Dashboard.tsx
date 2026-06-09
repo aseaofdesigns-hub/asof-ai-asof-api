@@ -4,25 +4,35 @@ import { StatCard } from "@/components/StatCard";
 import { RunAutomationForm } from "@/components/RunAutomationForm";
 import { SignalsTable } from "@/components/SignalsTable";
 import { ConfidenceChart } from "@/components/ConfidenceChart";
-import { useSignals } from "@/hooks/use-automation";
+import { useCodeAnalyses } from "@/hooks/use-automation";
 import { Activity, Zap, BarChart3, Database, ShieldCheck, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Dashboard() {
-  const { data: signals } = useSignals();
+  const { data: analyses } = useCodeAnalyses();
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("stripe_session_id");
     if (saved) setPaidSessionId(saved);
   }, []);
-  
-  const totalSignals = signals?.length || 0;
-  const avgConfidence = signals?.length 
-    ? (signals.reduce((acc, curr) => acc + curr.confidence, 0) / signals.length * 100).toFixed(1)
+
+  function riskToScore(riskLevel: string): number {
+    switch (riskLevel) {
+      case "SAFE": return 0.95;
+      case "NEEDS_REVIEW": return 0.65;
+      case "RISKY": return 0.35;
+      case "CRITICAL": return 0.10;
+      default: return 0.50;
+    }
+  }
+
+  const totalSignals = analyses?.length || 0;
+  const avgConfidence = analyses?.length
+    ? (analyses.reduce((acc, curr) => acc + riskToScore(curr.riskLevel), 0) / analyses.length * 100).toFixed(1)
     : "0.0";
-  const lastActive = signals?.length 
-    ? new Date(signals[0].timestamp!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const lastActive = analyses?.length
+    ? new Date(analyses[0].timestamp!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : "--:--";
 
   const container = {
@@ -147,7 +157,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-4 shrink-0">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <Database className="w-4 h-4 text-primary" />
-                    Recent Signals
+                    Recent Analyses
                   </h3>
                 </div>
                 <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
