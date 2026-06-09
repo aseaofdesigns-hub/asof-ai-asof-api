@@ -1,0 +1,58 @@
+Build a web app for ASOF.ai.
+
+ASOF.ai helps people check AI-generated code before they trust it or ship it. The app should let a user paste code that was written by AI, then show a visual review of what might be wrong, what assumptions the AI made, and what safer code could look like.
+
+Main page layout:
+
+1. Header
+- Logo/text: ASOF.ai
+- Tagline: Find hidden assumptions in AI-generated code before you ship.
+- Button: Check Code
+
+2. Code input area
+- Large code editor-style text box
+- Placeholder text: Paste AI-generated code here...
+- Optional second text box: What did you ask the AI to build?
+- Button: Analyze Code
+
+3. Results view
+After the user clicks Analyze Code, show a sample analysis.
+
+At the top, show a simple risk status:
+- Risk Level: Needs Review
+- Short summary: This code may work, but it makes assumptions that should be verified before use.
+
+4. Code preview section
+Show a side-by-side comparison:
+- Left panel title: Original AI Code
+- Right panel title: Safer Suggested Code
+
+The right side should show improved code with better error handling, validation, and safety checks. Highlight changed lines if possible.
+
+5. Suggestions section under the code preview
+Show cards or rows with plain-language suggestions:
+- The AI assumed the user is already authorized.
+- The code does not handle failed API responses.
+- The database update should verify ownership before changing data.
+- Inputs should be validated before being saved.
+- Add logging or alerts for unexpected failures.
+
+Each suggestion should include:
+- Problem
+- Why it matters
+- Suggested fix
+
+6. Visual style
+- Clean, modern developer-tool design
+- Dark mode preferred
+- Use readable monospace font for code
+- Make it feel trustworthy, serious, and easy to understand
+- Avoid too much marketing copy
+- The first screen should be the actual tool, not a landing page
+
+7. Important behavior
+This can be a prototype with mock results.
+When the user clicks Analyze Code, do not call a real backend yet. Just show realistic sample results so people understand the product.
+
+Core message:
+AI-generated code can look correct while being built on wrong assumptions. ASOF.ai shows what the AI guessed, what could break, and what safer code might look like.
