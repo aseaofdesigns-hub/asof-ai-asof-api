@@ -4,13 +4,12 @@ import { StatCard } from "@/components/StatCard";
 import { RunAutomationForm } from "@/components/RunAutomationForm";
 import { SignalsTable } from "@/components/SignalsTable";
 import { ConfidenceChart } from "@/components/ConfidenceChart";
-import { useCodeAnalyses, useSignals } from "@/hooks/use-automation";
-import { Activity, Zap, BarChart3, Database, ShieldCheck, Lock } from "lucide-react";
+import { useCodeAnalyses } from "@/hooks/use-automation";
+import { Activity, Zap, Database, ShieldCheck, Lock, AlertTriangle, AlertOctagon } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Dashboard() {
   const { data: analyses } = useCodeAnalyses();
-  const { data: signals } = useSignals();
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -18,33 +17,12 @@ export default function Dashboard() {
     if (saved) setPaidSessionId(saved);
   }, []);
 
-  function riskToScore(riskLevel: string): number {
-    switch (riskLevel) {
-      case "SAFE": return 0.95;
-      case "NEEDS_REVIEW": return 0.65;
-      case "RISKY": return 0.35;
-      case "CRITICAL": return 0.10;
-      default: return 0.50;
-    }
-  }
-
-  const hasAnalyses = analyses && analyses.length > 0;
-
-  const totalSignals = hasAnalyses
-    ? analyses.length
-    : (signals?.length || 0);
-
-  const avgConfidence = hasAnalyses
-    ? (analyses.reduce((acc, curr) => acc + riskToScore(curr.riskLevel), 0) / analyses.length * 100).toFixed(1)
-    : signals?.length
-    ? (signals.reduce((acc, s) => acc + s.confidence, 0) / signals.length * 100).toFixed(1)
-    : "0.0";
-
-  const lastActive = hasAnalyses
-    ? new Date(analyses[0].timestamp!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : signals?.length
-    ? new Date(signals[0].timestamp!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : "--:--";
+  const riskCounts = {
+    SAFE: analyses?.filter(a => a.riskLevel === "SAFE").length ?? 0,
+    NEEDS_REVIEW: analyses?.filter(a => a.riskLevel === "NEEDS_REVIEW").length ?? 0,
+    RISKY: analyses?.filter(a => a.riskLevel === "RISKY").length ?? 0,
+    CRITICAL: analyses?.filter(a => a.riskLevel === "CRITICAL").length ?? 0,
+  };
 
   const container = {
     hidden: { opacity: 0 },
@@ -110,38 +88,43 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <motion.div variants={item}>
-              <StatCard 
-                title="Total Signals" 
-                value={totalSignals} 
-                icon={<Database className="w-5 h-5" />} 
-                trend="+12% today"
-                trendUp={true}
+              <StatCard
+                title="Safe"
+                value={riskCounts.SAFE}
+                icon={<ShieldCheck className="w-5 h-5" />}
+                accentColor="emerald"
+                trend={riskCounts.SAFE > 0 ? "No issues found" : "No analyses yet"}
+                trendUp={riskCounts.SAFE > 0}
               />
             </motion.div>
             <motion.div variants={item}>
-              <StatCard 
-                title="Avg Confidence" 
-                value={`${avgConfidence}%`} 
-                icon={<Activity className="w-5 h-5" />} 
-                trend={parseFloat(avgConfidence) > 80 ? "High accuracy" : "Calibration needed"}
-                trendUp={parseFloat(avgConfidence) > 80}
+              <StatCard
+                title="Needs Review"
+                value={riskCounts.NEEDS_REVIEW}
+                icon={<Activity className="w-5 h-5" />}
+                accentColor="amber"
+                trend={riskCounts.NEEDS_REVIEW > 0 ? "Attention needed" : "All clear"}
+                trendUp={riskCounts.NEEDS_REVIEW === 0}
               />
             </motion.div>
             <motion.div variants={item}>
-              <StatCard 
-                title="System Status" 
-                value="Online" 
-                icon={<Zap className="w-5 h-5" />} 
-                className="border-emerald-500/20"
-                trend="Latency: 45ms"
-                trendUp={true}
+              <StatCard
+                title="Risky"
+                value={riskCounts.RISKY}
+                icon={<AlertTriangle className="w-5 h-5" />}
+                accentColor="orange"
+                trend={riskCounts.RISKY > 0 ? "Action required" : "All clear"}
+                trendUp={riskCounts.RISKY === 0}
               />
             </motion.div>
             <motion.div variants={item}>
-              <StatCard 
-                title="Last Active" 
-                value={lastActive} 
-                icon={<BarChart3 className="w-5 h-5" />} 
+              <StatCard
+                title="Critical"
+                value={riskCounts.CRITICAL}
+                icon={<AlertOctagon className="w-5 h-5" />}
+                accentColor="rose"
+                trend={riskCounts.CRITICAL > 0 ? "Immediate action" : "All clear"}
+                trendUp={riskCounts.CRITICAL === 0}
               />
             </motion.div>
           </div>
