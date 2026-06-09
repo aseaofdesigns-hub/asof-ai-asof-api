@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, ChevronDown, ChevronUp, Sparkles, Eye, ArrowUpCircle, MailSearch } from "lucide-react";
+import { Loader2, Code2, ShieldCheck, Zap, CheckCircle2, Lock, AlertTriangle, XCircle, Download, Sparkles, Eye, ArrowUpCircle, MailSearch } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -1071,39 +1071,28 @@ export function RunAutomationForm() {
                 </div>
               )}
 
-              {/* Side-by-side code diff */}
+              {/* Side-by-side code diff — always visible */}
               {result.safer_code && (
-                <div className="space-y-2">
-                  <button
-                    data-testid="button-toggle-code"
-                    onClick={() => setShowSaferCode(v => !v)}
-                    className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-primary hover:text-primary/80 transition-colors"
-                  >
-                    {showSaferCode ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    🚦 Safer suggested code
-                  </button>
-                  <AnimatePresence>
-                    {showSaferCode && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-1">Original AI Code</p>
-                            <pre className="text-[9px] font-mono leading-relaxed bg-white/5 border border-white/10 rounded-lg p-3 overflow-x-auto text-white/60 whitespace-pre-wrap break-all">{code}</pre>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 px-1">Safer Suggested Code</p>
-                            <pre className="text-[9px] font-mono leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 overflow-x-auto text-emerald-100/80 whitespace-pre-wrap break-all">{result.safer_code}</pre>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35 }}
+                  className="space-y-2 pt-1"
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    🚦 Safer Suggested Code
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground px-1">Original AI Code</p>
+                      <pre className="text-[9px] font-mono leading-relaxed bg-white/5 border border-white/10 rounded-lg p-3 overflow-x-auto text-white/60 whitespace-pre-wrap break-all">{code}</pre>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 px-1">Safer Suggested Code</p>
+                      <pre className="text-[9px] font-mono leading-relaxed bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3 overflow-x-auto text-emerald-100/80 whitespace-pre-wrap break-all">{result.safer_code}</pre>
+                    </div>
+                  </div>
+                </motion.div>
               )}
 
               {/* Gated upgrade prompt — diff pricing with analysisId */}
