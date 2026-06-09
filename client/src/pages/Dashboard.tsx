@@ -58,7 +58,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">As-of AI Automation</h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
-              ASOF.ai is a paid automation that verifies whether an assumption, signal, or dataset is still valid as of the current moment, returning a confidence-scored decision agents can safely act on.
+              Paste your signals or connect your agent. ASOF finds risky assumptions, missing checks, and places where the AI may have guessed — returning a confidence-scored verdict you can act on.
             </p>
           </div>
 

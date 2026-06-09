@@ -46,9 +46,9 @@ export default function FAQ() {
       icon: <X className="w-4 h-4 text-red-400" />
     },
     {
-      question: "Can ASOF.ai run without payment?",
-      answer: "No. Every validation requires a paid Stripe session.",
-      icon: <X className="w-4 h-4 text-red-400" />
+      question: "Can I try ASOF.ai before paying?",
+      answer: "Yes. You get one free Lite-tier validation per device — no payment required. After that, each run requires a paid session.",
+      icon: <Check className="w-4 h-4 text-emerald-400" />
     },
     {
       question: "Can I cancel?",
