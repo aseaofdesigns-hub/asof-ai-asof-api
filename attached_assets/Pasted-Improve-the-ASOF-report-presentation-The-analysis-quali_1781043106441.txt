@@ -1,0 +1,76 @@
+Improve the ASOF report presentation.
+
+The analysis quality is good, but the report is too text-heavy. Make the output easier to scan and more useful for users.
+
+New report layout:
+
+1. Risk Summary
+At the top, show:
+- Risk Level
+- One short plain-English summary
+- Code Health / Safety score if available
+
+Example:
+“Critical: This endpoint can upgrade the wrong user, charge incorrectly, or mark a subscription active before payment is confirmed.”
+
+2. Top 3 Fix First
+Add a section near the top called “Fix These First”.
+
+Show the three most important fixes:
+1. Do not trust userId from req.body. Use the authenticated user session.
+2. Verify Stripe payment status before marking the subscription active.
+3. Add idempotency protection to prevent duplicate charges.
+
+3. Group assumptions by category
+Instead of one long bullet list, group “What the AI Assumed” into categories:
+
+- Authentication & Ownership
+- Payment Safety
+- Database Consistency
+- Error Handling
+- User Communication
+
+Each category should contain related assumptions.
+
+4. Add severity labels
+For each risk or issue, show a severity tag:
+- Critical
+- High
+- Medium
+- Low
+
+Example:
+[Critical] The code trusts client-supplied userId.
+[High] The code does not verify that the Stripe payment succeeded.
+[High] Duplicate requests may cause multiple charges.
+
+5. Keep “What Could Break”, but group it
+Group the “What Could Break” section into the same categories instead of showing one long wall of text.
+
+6. Add plain-English explanations
+For technical issues, include a simple explanation.
+
+Example:
+Technical:
+“The endpoint trusts req.body.userId.”
+
+Plain English:
+“Someone could change the userId in the request and affect another person’s account.”
+
+7. Max tier report structure
+For Max, show the full report in this order:
+
+- Risk Summary
+- Top 3 Fix First
+- What the AI Assumed
+- What Could Break
+- Verify Checklist
+- Suggestion Cards
+- Safe Rewrite
+- Full Technical Details
+
+8. Make the PDF match the dashboard
+The downloaded PDF report should use the same structure and be easy to scan.
+
+Goal:
+The report should feel less like a long document and more like a clear action plan.

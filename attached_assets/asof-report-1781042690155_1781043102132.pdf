@@ -1,0 +1,469 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 7101
+>>
+stream
+0.5670000000000001 w
+0 G
+0.04 0.04 0.08 rg
+0. 841.8899999999999864 595.2799999999999727 -119.0551181102362364 re
+f
+BT
+/F2 20 Tf
+23. TL
+1. g
+39.6850393700787407 790.8663779527558972 Td
+(ASOF.ai) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.627 0.627 0.706 rg
+39.6850393700787407 762.5199212598424765 Td
+(AI Code Assumption Analysis Report) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.627 0.627 0.706 rg
+39.6850393700787407 739.8427559055118081 Td
+(Generated: 6/9/2026, 6:04:50 PM) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.937 0.267 0.267 rg
+39.6850393700787407 688.819133858267719 Td
+(Risk Level: CRITICAL) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.235 0.235 0.314 rg
+39.6850393700787407 666.1419685039369369 Td
+(This endpoint trusts client-supplied identifiers and marks a user's subscription active immediately after a payment) Tj
+T* (attempt, without validating ownership, authentication, Stripe success state, or database lookup results. It can charge) Tj
+T* (the wrong customer, upgrade arbitrary users, and leave billing/application state inconsistent.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.118 0.118 0.157 rg
+39.6850393700787407 595.2758267716535556 Td
+(What the AI Assumed) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 575.4333070866141497 Td
+(• The AI assumed req.body.userId is trustworthy and belongs to the authenticated caller.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 557.0081102362204319 Td
+(• The AI assumed db.users.findOne\({ id: userId }\) always returns a valid user object with a defined email.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 538.5829133858267141 Td
+(• The AI assumed db.plans.findOne\({ id: planId }\) always returns a valid plan object with a valid numeric price and name.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 520.1577165354329964 Td
+(• The AI assumed plan.price is already in Stripe's expected smallest currency unit for amount.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 501.7325196850393354 Td
+(• The AI assumed paymentMethodId can safely be used to charge this user without verifying that the payment method belongs to) Tj
+T* (the customer.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 470.5514173228345953 Td
+(• The AI assumed confirming the PaymentIntent with confirm: true means the payment fully succeeded and no further action is) Tj
+T* (required.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 439.3703149606298552 Td
+(• The AI assumed the user already has or does not need a Stripe customer record, and that charging without customer linkage is) Tj
+T* (acceptable.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 408.1892125984251152 Td
+(• The AI assumed no authorization checks are needed to determine whether the caller may upgrade the target user account.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 389.7640157480314542 Td
+(• The AI assumed there is no need for idempotency protection, so retries will not create duplicate charges.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 371.3388188976377364 Td
+(• The AI assumed updating db.users, inserting db.auditLogs, and sending email can happen independently without transactional) Tj
+T* (consistency concerns.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 340.1577165354329964 Td
+(• The AI assumed every paid plan change should set subscriptionStatus to "active" immediately, regardless of payment state,) Tj
+T* (existing subscription state, or downstream failures.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 308.9766141732283131 Td
+(• The AI assumed unhandled exceptions from Stripe, db.users.update, db.auditLogs.insert, or email.send will not cause) Tj
+T* (problematic partial completion.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.118 0.118 0.157 rg
+39.6850393700787407 266.4569291338582389 Td
+(What Could Break) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 246.614409448818833 Td
+(• An attacker can supply another user's userId and upgrade that account if there is no separate authentication/authorization layer) Tj
+T* (enforcing ownership.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 215.4333070866141497 Td
+(• If user is null, user.email will throw and the request may fail after a charge has already been created.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 197.0081102362204319 Td
+(• If plan is null, plan.price and plan.name will throw, causing a 500 error and possible inconsistent behavior.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 178.5829133858267141 Td
+(• If plan.price is stored as dollars instead of cents, Stripe may undercharge or overcharge by a factor of 100.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 160.1577165354329964 Td
+(• A PaymentIntent may return requires_action, requires_payment_method, processing, or fail entirely, but the code still upgrades) Tj
+T* (the user if stripe.paymentIntents.create resolves without checking charge.status.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 128.9766141732283131 Td
+(• Without tying paymentMethodId to a Stripe customer, the API may attempt to charge an invalid, detached, or unauthorized) Tj
+T* (payment method.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 97.7955118110235162 Td
+(• Network retries or client resubmissions can create multiple PaymentIntents and double-charge the user because there is no) Tj
+T* (idempotency key.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 66.614409448818833 Td
+(• If db.users.update succeeds but db.auditLogs.insert or email.send fails, the API leaves the plan upgraded without a) Tj
+T* (corresponding audit trail or notification.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 35.4333070866140361 Td
+(• If Stripe charge succeeds but db.users.update fails, the customer may be charged without receiving the upgraded plan.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 17.0081102362203183 Td
+(• The route returns success even though it does not verify whether the update actually modified a user record.) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.235 0.235 0.314 rg
+45.354330708661422 -1.4170866141732859 Td
+(• No input validation on userId, planId, and paymentMethodId can cause malformed queries, confusing errors, or abuse.) Tj
+ET
+0.04 0.04 0.08 rg
+0. 39.6850393700787407 595.2799999999999727 -39.6850393700787407 re
+f
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 0.471 0.549 rg
+39.6850393700787407 14.1732283464566535 Td
+(ASOF.ai — asofai.com  |  Support@asofai.com) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R ]
+/Count 1
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+/F4 8 0 R
+/F5 9 0 R
+/F6 10 0 R
+/F7 11 0 R
+/F8 12 0 R
+/F9 13 0 R
+/F10 14 0 R
+/F11 15 0 R
+/F12 16 0 R
+/F13 17 0 R
+/F14 18 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+19 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20260609180450-04'00')
+>>
+endobj
+20 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000007305 00000 n 
+0000009122 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000007362 00000 n 
+0000007487 00000 n 
+0000007617 00000 n 
+0000007750 00000 n 
+0000007887 00000 n 
+0000008010 00000 n 
+0000008139 00000 n 
+0000008271 00000 n 
+0000008407 00000 n 
+0000008535 00000 n 
+0000008662 00000 n 
+0000008791 00000 n 
+0000008924 00000 n 
+0000009026 00000 n 
+0000009370 00000 n 
+0000009456 00000 n 
+trailer
+<<
+/Size 21
+/Root 20 0 R
+/Info 19 0 R
+/ID [ <AE0CDCB378D4CCC6FB3E0B9E661A6ACA> <AE0CDCB378D4CCC6FB3E0B9E661A6ACA> ]
+>>
+startxref
+9560
+%%EOF
