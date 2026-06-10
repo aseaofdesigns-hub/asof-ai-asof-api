@@ -553,6 +553,18 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       .then(d => setFreeTrialAvailable(d.available))
       .catch(() => setFreeTrialAvailable(false));
 
+    // Restore code/prompt the user typed before being redirected to Stripe
+    const pendingCode = localStorage.getItem("asof_pending_code");
+    const pendingPrompt = localStorage.getItem("asof_pending_prompt");
+    if (pendingCode) {
+      setCode(pendingCode);
+      localStorage.removeItem("asof_pending_code");
+    }
+    if (pendingPrompt) {
+      setUserPrompt(pendingPrompt);
+      localStorage.removeItem("asof_pending_prompt");
+    }
+
     // Check for pending upgrade (returned from Stripe after an upgrade payment)
     const raw = localStorage.getItem("pending_upgrade");
     if (raw) {
@@ -593,6 +605,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       if (!url || !url.startsWith('https://checkout.stripe.com')) {
         throw new Error("Invalid payment URL received");
       }
+      localStorage.setItem("asof_pending_code", code);
+      localStorage.setItem("asof_pending_prompt", userPrompt);
       if (window.self !== window.top) window.open(url, '_blank');
       else window.location.href = url;
     } catch (err) {
