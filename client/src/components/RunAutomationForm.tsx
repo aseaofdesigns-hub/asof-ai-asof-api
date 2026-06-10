@@ -611,9 +611,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     setIsDemo(false);
     setShowSaferCode(false);
     try {
-      const body: any = { code, prompt: userPrompt || undefined };
-      if (asFree) body.fingerprint = getFingerprint();
-      else if (paidSessionId) body.sessionId = paidSessionId;
+      const body: any = { code, prompt: userPrompt || undefined, fingerprint: getFingerprint() };
+      if (!asFree && paidSessionId) body.sessionId = paidSessionId;
 
       const res = await fetch('/api/analyze-code', {
         method: 'POST',
@@ -1090,7 +1089,53 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             </motion.div>
           )}
         </AnimatePresence>
+
+        <RotatingTip />
       </CardContent>
     </Card>
+  );
+}
+
+const TIPS = [
+  { emoji: "🎯", text: "Be specific — tell the AI what language, framework, and constraints you're working with before asking it to write code." },
+  { emoji: "🚨", text: "Never trust AI-generated auth, payment, or permission code without a manual audit. These are the highest-risk areas." },
+  { emoji: "🔄", text: "Ask the AI: 'What assumptions did you make writing this?' — it often surfaces hidden risks you can then check." },
+  { emoji: "⚠️", text: "Check all imports — AI sometimes references packages that don't exist, are deprecated, or have breaking API changes." },
+  { emoji: "💸", text: "Money-handling code needs idempotency keys, rollback logic, and atomic transactions. AI rarely includes these by default." },
+  { emoji: "🕳️", text: "Test null and empty inputs — AI-generated code often skips edge-case validation on function arguments." },
+  { emoji: "🔐", text: "Ask the AI to include error handling in the same prompt, not as a follow-up — it's harder to bolt on safely after the fact." },
+  { emoji: "📦", text: "Paste the original prompt alongside the code — ASOF uses it to find assumptions the AI made based on what you asked for." },
+  { emoji: "🧪", text: "AI code that works in dev can silently fail in production due to env differences, missing secrets, or different DB states." },
+  { emoji: "🔁", text: "Race conditions are invisible in single-user tests. Always ask: what happens if two users hit this simultaneously?" },
+  { emoji: "🌐", text: "API calls without timeouts will hang forever under load. Always specify timeout and retry behavior in your prompt." },
+  { emoji: "🗄️", text: "Check that database queries use parameterized inputs — AI sometimes concatenates user input directly into SQL strings." },
+];
+
+function RotatingTip() {
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * TIPS.length));
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setIndex(i => (i + 1) % TIPS.length);
+        setVisible(true);
+      }, 400);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const tip = TIPS[index];
+
+  return (
+    <div className="mt-4 mx-1 mb-1 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 min-h-[68px] flex items-start gap-3 transition-opacity duration-400"
+      style={{ opacity: visible ? 1 : 0 }}>
+      <span className="text-lg shrink-0 mt-0.5">{tip.emoji}</span>
+      <div>
+        <p className="text-[9px] font-bold uppercase tracking-widest text-primary/60 mb-0.5">Prompt tip</p>
+        <p className="text-[11px] text-white/65 leading-relaxed">{tip.text}</p>
+      </div>
+    </div>
   );
 }
