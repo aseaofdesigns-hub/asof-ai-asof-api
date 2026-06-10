@@ -39,41 +39,7 @@ export default function Dashboard() {
   const { data: analyses } = useCodeAnalyses();
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
   const [riskFilter, setRiskFilter] = useState<RiskLevel | null>(null);
-  const [analysisData, setAnalysisData] = useState<{ result: CodeAnalysisResult; code: string } | null>({
-    code: "async function chargeAndOrder(userId, cartItems) {\n  const total = cartItems.reduce((s, i) => s + i.price, 0);\n  await stripe.charges.create({ amount: total, customer: user.stripeCustomerId });\n  await db.orders.create({ userId, cartItems, status: 'confirmed' });\n  await emailService.send(userId, 'order-confirmed');\n}",
-    result: {
-      risk_level: "CRITICAL",
-      summary: "This AI-generated function charges a card and creates an order in two separate steps with no transaction safety. If the database write fails after the charge succeeds, you'll have a customer billed but no order record — with no automatic rollback or retry logic.",
-      assumptions: [
-        { severity: "HIGH", text: "Assumes the Stripe charge will always complete before the database write, with no handling for partial failures between the two operations." },
-        { severity: "HIGH", text: "Assumes `user.stripeCustomerId` always exists — if the user has no saved Stripe customer, this silently passes `undefined` to Stripe." },
-        { severity: "MEDIUM", text: "Assumes `total` is already in the correct currency's smallest unit (cents for USD). If `item.price` is in dollars, the charge will be 100× too small." },
-        { severity: "LOW", text: "Assumes `emailService.send` failures are non-critical and can be ignored without alerting the caller." },
-      ],
-      risks: [
-        { severity: "HIGH", text: "No try/catch: any uncaught exception leaves the user charged but without an order, with no compensation or rollback path." },
-        { severity: "HIGH", text: "Race condition: two simultaneous calls for the same cart could create duplicate charges before either order is committed." },
-        { severity: "MEDIUM", text: "No idempotency key on the Stripe charge — retrying on a network timeout will create a second charge." },
-        { severity: "LOW", text: "Order confirmation email is sent synchronously; a slow email provider will block the entire request." },
-      ],
-      checks: [
-        "Verify `item.price` units — confirm they are already in cents, not dollars",
-        "Confirm all users have a `stripeCustomerId` before this function is reachable",
-        "Add a Stripe idempotency key tied to `userId + cartItems` hash",
-        "Wrap the charge + order creation in a try/catch with a Stripe refund in the catch block",
-      ],
-      suggestions: [
-        { problem: "No atomic transaction between charge and order creation", why_it_matters: "A server crash between the two steps will bill the customer without creating an order, requiring manual reconciliation.", fix: "Use a database transaction and only confirm the Stripe charge after the order row is committed." },
-        { problem: "Missing Stripe idempotency key", why_it_matters: "Network retries on a timeout will create duplicate real charges on the customer's card.", fix: "Add `idempotencyKey: `order-${userId}-${cartHash}`` to every `stripe.charges.create` call." },
-        { problem: "No input validation", why_it_matters: "Malformed cartItems or a missing userId will cause a silent failure or corrupt data.", fix: "Validate all inputs with a schema check before calling Stripe or the database." },
-        { problem: "Unsafe payment amount assumption", why_it_matters: "If prices are stored in dollars but Stripe expects cents, every charge will be 100× too small.", fix: "Explicitly convert to cents: `Math.round(item.price * 100)`." },
-        { problem: "No idempotency protection", why_it_matters: "Concurrent requests can result in duplicate charges.", fix: "Use a distributed lock or database-level unique constraint on the order before charging." },
-        { problem: "Lack of transactional consistency", why_it_matters: "Partial writes leave the system in an inconsistent state with no recovery path.", fix: "Wrap the DB write in a transaction and only capture the charge on success." },
-      ],
-      tier: "max",
-      gated: false,
-    }
-  });
+  const [analysisData, setAnalysisData] = useState<{ result: CodeAnalysisResult; code: string } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("stripe_session_id");
