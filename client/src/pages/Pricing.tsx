@@ -81,6 +81,9 @@ export default function Pricing() {
       });
       if (!res.ok) throw new Error((await res.json()).message || "Payment failed");
       const { url } = await res.json();
+      if (!url || !url.startsWith("https://checkout.stripe.com")) {
+        throw new Error("Invalid payment URL received");
+      }
       if (window.self !== window.top) window.open(url, "_blank");
       else window.location.href = url;
     } catch (err) {
