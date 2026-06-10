@@ -832,9 +832,26 @@ export async function registerRoutes(
         unit_amount = fallback.unit_amount;
       }
 
+      const tierMeta: Record<string, { name: string; description: string }> = {
+        lite: { name: 'ASOF Lite', description: 'Risk verdict + all hidden assumptions + every way it could break' },
+        pro:  { name: 'ASOF Pro',  description: 'Everything in Lite, plus a verify checklist and detailed fix cards' },
+        max:  { name: 'ASOF Max',  description: 'Full analysis + safer code rewrite side-by-side — drop it straight in' },
+      };
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        line_items: [{ price: price_id, quantity: 1, adjustable_quantity: { enabled: true, minimum: 1, maximum: 20 } }],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            unit_amount: unit_amount as number,
+            product_data: {
+              name: tierMeta[tier]?.name ?? `ASOF ${tier}`,
+              description: tierMeta[tier]?.description ?? 'AI code audit',
+            },
+          },
+          quantity: 1,
+          adjustable_quantity: { enabled: true, minimum: 1, maximum: 20 },
+        }],
         mode: 'payment',
         success_url: `${baseUrl}/verify?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/`,
