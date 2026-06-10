@@ -544,7 +544,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     setShowExampleResult(false);
   };
 
-  const showMockResult = () => { setShowExampleResult(v => !v); };
+  const showMockResult = () => { onResult?.(EXAMPLE_RESULT, EXAMPLE_CODE); };
 
   useEffect(() => {
     loadSessions();
@@ -711,7 +711,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                 className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/25 transition-all"
               >
                 <Eye className="w-3 h-3" />
-                {showExampleResult ? "Hide result" : "See result"}
+                See result
               </button>
             )}
           </div>
@@ -748,72 +748,6 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             spellCheck={false}
           />
         </div>
-
-        {/* Pre-rendered example result panel */}
-        <AnimatePresence>
-          {showExampleResult && (
-            <motion.div
-              key="example-result"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="space-y-4 rounded-xl border border-orange-500/20 bg-orange-500/5 p-4"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <Eye className="w-3.5 h-3.5 text-orange-400" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Example Output — not a real run</span>
-              </div>
-              <div className={`rounded-xl border p-4 space-y-2 ${RISK_META.RISKY.bg}`}>
-                <div className="flex items-center gap-2">
-                  {RISK_META.RISKY.icon}
-                  <span className={`font-bold text-sm ${RISK_META.RISKY.color}`}>{RISK_META.RISKY.label}</span>
-                </div>
-                <p className="text-xs text-white/80 leading-relaxed">{EXAMPLE_RESULT.summary}</p>
-                <span className="inline-block text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">max tier</span>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🔍 What the AI assumed</p>
-                {EXAMPLE_RESULT.assumptions!.map((a, i) => (
-                  <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/15">
-                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase ${SEV_COLOR[a.severity]}`}>{a.severity}</span>
-                    <p className="text-xs text-white/75 leading-relaxed">{a.text}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">💥 What could break</p>
-                {EXAMPLE_RESULT.risks!.map((r, i) => (
-                  <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/15">
-                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5 uppercase ${SEV_COLOR[r.severity]}`}>{r.severity}</span>
-                    <p className="text-xs text-white/75 leading-relaxed">{r.text}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">✅ What to verify</p>
-                <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 space-y-1.5">
-                  {EXAMPLE_RESULT.checks!.map((c, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <span className="text-amber-500/60 shrink-0 mt-0.5">□</span>
-                      <p className="text-xs text-white/75 leading-relaxed">{c}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🛠 Suggestions</p>
-                {EXAMPLE_RESULT.suggestions!.map((s, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-white/5 border border-white/10 space-y-1.5">
-                    <p className="text-xs font-bold text-white">{s.problem}</p>
-                    <p className="text-[10px] text-red-300/70 leading-snug"><span className="font-semibold text-red-400/90">Why it matters:</span> {s.why_it_matters}</p>
-                    <p className="text-[10px] text-emerald-300/70 leading-snug"><span className="font-semibold text-emerald-400/90">Fix:</span> {s.fix}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[9px] text-muted-foreground/50 text-center pt-1">This is a pre-rendered preview. Run your own code to get a real analysis.</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* CTA area */}
         {freeTrialAvailable && (
