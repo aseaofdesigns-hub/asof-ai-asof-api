@@ -288,7 +288,7 @@ export default function Pricing() {
           transition={{ duration: 0.4, delay: 0.3 }}
           className="text-center text-xs text-muted-foreground mt-8"
         >
-          Payments are processed securely by Stripe. No subscription. No renewal. One analysis, one payment.
+          Prices listed in USD. Stripe accepts all major cards worldwide and converts to your local currency at checkout. No subscription. No renewal. One analysis, one payment.
         </motion.p>
       </main>
     </div>

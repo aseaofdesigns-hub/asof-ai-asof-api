@@ -913,7 +913,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                 <span className="text-xs font-bold text-white">{tier.price}</span>
               </button>
             ))}
-            <div className="text-center pt-1">
+            <div className="text-center pt-1 space-y-0.5">
+              <p className="text-[9px] text-muted-foreground/60">Prices in USD · Stripe converts to your local currency at checkout</p>
               <Link data-testid="link-full-pricing" href="/pricing" className="text-[10px] text-muted-foreground hover:text-primary transition-colors">
                 View full pricing comparison →
               </Link>
@@ -928,6 +929,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               <span className="text-[9px] text-muted-foreground uppercase tracking-widest">or pay for deeper analysis</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
+            <p className="text-[9px] text-muted-foreground/50 text-center -mt-1">Prices in USD · Stripe converts to your local currency at checkout</p>
             <div className="rounded-xl border border-white/10 overflow-hidden text-[9px]">
               <div className="grid grid-cols-4 bg-white/5 border-b border-white/10">
                 <div className="p-2 text-muted-foreground font-semibold uppercase tracking-wider">Feature</div>
