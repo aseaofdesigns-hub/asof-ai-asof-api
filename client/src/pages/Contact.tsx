@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Mail, MessageSquare, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +81,7 @@ export default function Contact() {
           </div>
         </motion.div>
       </main>
+      <Footer />
     </div>
   );
 }

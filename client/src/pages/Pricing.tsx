@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Lock, Zap, ShieldCheck, Loader2, Tag, PartyPopper, X } from "lucide-react";
@@ -294,6 +295,7 @@ export default function Pricing() {
           Prices listed in USD. Stripe accepts all major cards worldwide and converts to your local currency at checkout. No subscription. No renewal. One analysis, one payment.
         </motion.p>
       </main>
+      <Footer />
     </div>
   );
 }

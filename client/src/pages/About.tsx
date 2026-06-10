@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { ShieldCheck, Zap, Globe, AlertTriangle, Code2, GitPullRequest, Cpu, Users } from "lucide-react";
 
 export default function About() {
@@ -241,6 +242,7 @@ export default function About() {
 
         </motion.div>
       </main>
+      <Footer />
     </div>
   );
 }

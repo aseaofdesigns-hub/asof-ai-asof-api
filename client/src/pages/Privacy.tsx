@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Shield, Eye, Lock, FileText } from "lucide-react";
 
 export default function Privacy() {
@@ -59,6 +60,7 @@ export default function Privacy() {
           </div>
         </motion.div>
       </main>
+      <Footer />
     </div>
   );
 }

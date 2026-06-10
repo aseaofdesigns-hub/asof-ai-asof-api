@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreditCard, Lightbulb, HelpCircle, Check, X, Copy, CheckCircle } from "lucide-react";
 import {
@@ -188,6 +189,7 @@ export default function FAQ() {
           </motion.div>
         </motion.div>
       </main>
+      <Footer />
     </div>
   );
 }

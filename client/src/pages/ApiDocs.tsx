@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { Footer } from "@/components/Footer";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -688,6 +689,7 @@ console.log(data.data.confidence); // 0.98 for MAX tier`;
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

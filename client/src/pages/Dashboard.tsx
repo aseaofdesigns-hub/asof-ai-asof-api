@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { StatCard } from "@/components/StatCard";
 import { RunAutomationForm, downloadReport } from "@/components/RunAutomationForm";
 import { AnalysisResultPanel } from "@/components/AnalysisResultPanel";
@@ -270,6 +271,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
       </main>
+      <Footer />
     </div>
   );
 }
