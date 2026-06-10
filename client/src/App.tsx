@@ -11,6 +11,7 @@ import Contact from "@/pages/Contact";
 import ApiDocs from "@/pages/ApiDocs";
 import FAQ from "@/pages/FAQ";
 import Pricing from "@/pages/Pricing";
+import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/docs" component={ApiDocs} />
       <Route path="/faq" component={FAQ} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );

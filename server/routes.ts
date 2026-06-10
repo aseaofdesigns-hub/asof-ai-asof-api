@@ -8,7 +8,7 @@ import { z } from "zod";
 import { getUncachableStripeClient } from "./stripeClient";
 import { sql, eq } from "drizzle-orm";
 import { db } from "./db";
-import { freeTrials } from "@shared/schema";
+import { freeTrials, payments, codeAnalyses } from "@shared/schema";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -1363,6 +1363,30 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
       return res.json({ ...base, risks: fullData.risks ?? [], checks: fullData.checks ?? [], safer_code: fullData.safer_code ?? '', suggestions: fullData.suggestions ?? [], gated: false });
     } catch (err: any) {
       res.status(500).json({ message: err?.message ?? "Failed to fetch analysis" });
+    }
+  });
+
+  app.get("/api/admin/lookup", async (req, res) => {
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const provided = req.headers["x-admin-password"];
+    if (!adminPassword || provided !== adminPassword) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const { sessionId } = req.query as { sessionId?: string };
+    if (!sessionId) return res.status(400).json({ message: "sessionId required" });
+    try {
+      const [payment] = await db
+        .select()
+        .from(payments)
+        .where(eq(payments.stripeSessionId, sessionId));
+      if (!payment) return res.status(404).json({ message: "No payment found for that session ID." });
+      const [analysis] = await db
+        .select()
+        .from(codeAnalyses)
+        .where(eq(codeAnalyses.sessionId, sessionId));
+      return res.json({ payment, analysis: analysis ?? null });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message ?? "Lookup failed" });
     }
   });
 
