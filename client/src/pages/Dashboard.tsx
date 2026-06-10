@@ -246,29 +246,28 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* ── Analysis Result Panel sits in the right column, filling the space beside the form ── */}
+              <AnimatePresence>
+                {analysisData && (
+                  <motion.div
+                    key="analysis-panel"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <AnalysisResultPanel
+                      result={analysisData.result}
+                      originalCode={analysisData.code}
+                      onDismiss={() => setAnalysisData(null)}
+                      onDownloadPDF={() => void downloadReport(analysisData.result, analysisData.code)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
             </motion.div>
           </div>
-
-          {/* ── Full Analysis Result Panel (full width below grid) ── */}
-          <AnimatePresence>
-            {analysisData && (
-              <motion.div
-                key="analysis-panel"
-                variants={item}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                className="mt-6"
-              >
-                <AnalysisResultPanel
-                  result={analysisData.result}
-                  originalCode={analysisData.code}
-                  onDismiss={() => setAnalysisData(null)}
-                  onDownloadPDF={() => void downloadReport(analysisData.result, analysisData.code)}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
         </motion.div>
       </main>
     </div>
