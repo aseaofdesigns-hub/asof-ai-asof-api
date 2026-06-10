@@ -17,8 +17,11 @@ function getOwnerParams(): string {
 }
 
 export function useCodeAnalyses() {
+  const fp = localStorage.getItem("asof_fp") ?? "";
+  const sid = localStorage.getItem("stripe_session_id") ?? "";
+
   return useQuery<CodeAnalysis[]>({
-    queryKey: ['/api/code-analyses'],
+    queryKey: ['/api/code-analyses', fp, sid],
     queryFn: async () => {
       const qs = getOwnerParams();
       if (!qs) return [];
@@ -27,6 +30,7 @@ export function useCodeAnalyses() {
       return res.json();
     },
     refetchInterval: 5000,
+    enabled: !!fp || !!sid,
   });
 }
 
