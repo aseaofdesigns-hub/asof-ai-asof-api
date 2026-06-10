@@ -285,12 +285,31 @@ export default function Pricing() {
           </div>
         </motion.div>
 
+        {/* Browser session disclaimer */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.25 }}
+          className="mt-10 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-6 py-5 flex items-start gap-4"
+        >
+          <span className="text-xl shrink-0 mt-0.5">⚠️</span>
+          <div className="space-y-1.5">
+            <p className="text-sm font-bold text-amber-300">Important — do not clear your browser cache or site data</p>
+            <p className="text-xs text-white/60 leading-relaxed">
+              Because ASOF doesn't require an account, your paid credits and analysis history are tied to a unique ID stored in <span className="text-white/80 font-medium">this browser only</span>. If you clear your browser's cache, cookies, or site data — or switch to a different browser or device — that ID is gone and your credits cannot be automatically recovered.
+            </p>
+            <p className="text-xs text-white/60 leading-relaxed">
+              If this happens, email <a href="mailto:Support@asofai.com" className="text-amber-300 hover:underline font-medium">Support@asofai.com</a> with the email address you used at checkout and we'll manually restore your credits. Keep your Stripe receipt as proof of purchase.
+            </p>
+          </div>
+        </motion.div>
+
         {/* Footer note */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4, delay: 0.3 }}
-          className="text-center text-xs text-muted-foreground mt-8"
+          className="text-center text-xs text-muted-foreground mt-6"
         >
           Prices listed in USD. Stripe accepts all major cards worldwide and converts to your local currency at checkout. No subscription. No renewal. One analysis, one payment.
         </motion.p>
