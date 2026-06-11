@@ -361,12 +361,15 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string) 
   if (result.checks?.length) {
     sectionHeader("Verify Checklist");
     for (const c of result.checks) {
-      const lines = doc.splitTextToSize(`☐  ${c}`, cW - 8);
+      const lines = doc.splitTextToSize(c, cW - 20);
       checkY(lines.length * 5 + 5);
       doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
+      doc.setFont("helvetica", "bold");
       doc.setTextColor(40, 100, 60);
-      doc.text(lines, M + 4, y);
+      doc.text("[ ]", M + 4, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(55, 50, 80);
+      doc.text(lines, M + 16, y);
       y += lines.length * 5 + 3;
     }
     y += 4;
