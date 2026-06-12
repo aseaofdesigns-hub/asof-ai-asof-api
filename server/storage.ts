@@ -14,7 +14,7 @@ export interface IStorage {
   hasUsedFreeTrial(fingerprint: string): Promise<boolean>;
   markFreeTrialUsed(fingerprint: string): Promise<void>;
   createCodeAnalysis(analysis: InsertCodeAnalysis): Promise<CodeAnalysis>;
-  getCodeAnalyses(filter: { fingerprint?: string; sessionId?: string }): Promise<CodeAnalysis[]>;
+  getCodeAnalyses(filter: { fingerprint?: string; sessionIds?: string[] }): Promise<CodeAnalysis[]>;
   getAnalysisById(id: number): Promise<CodeAnalysis | undefined>;
   upgradeAnalysisTier(id: number, tier: string): Promise<CodeAnalysis>;
 }
@@ -88,22 +88,15 @@ export class DatabaseStorage implements IStorage {
     return record;
   }
 
-  async getCodeAnalyses(filter: { fingerprint?: string; sessionId?: string }): Promise<CodeAnalysis[]> {
-    const { fingerprint, sessionId } = filter;
-    if (!fingerprint && !sessionId) return [];
-    if (fingerprint && sessionId) {
-      const { or } = await import("drizzle-orm");
-      return await db.select().from(codeAnalyses)
-        .where(or(eq(codeAnalyses.fingerprint, fingerprint), eq(codeAnalyses.sessionId, sessionId)))
-        .orderBy(desc(codeAnalyses.timestamp));
-    }
-    if (fingerprint) {
-      return await db.select().from(codeAnalyses)
-        .where(eq(codeAnalyses.fingerprint, fingerprint))
-        .orderBy(desc(codeAnalyses.timestamp));
-    }
+  async getCodeAnalyses(filter: { fingerprint?: string; sessionIds?: string[] }): Promise<CodeAnalysis[]> {
+    const { fingerprint, sessionIds = [] } = filter;
+    if (!fingerprint && sessionIds.length === 0) return [];
+    const { or, inArray } = await import("drizzle-orm");
+    const conditions = [];
+    if (fingerprint) conditions.push(eq(codeAnalyses.fingerprint, fingerprint));
+    if (sessionIds.length > 0) conditions.push(inArray(codeAnalyses.sessionId, sessionIds));
     return await db.select().from(codeAnalyses)
-      .where(eq(codeAnalyses.sessionId, sessionId!))
+      .where(or(...conditions))
       .orderBy(desc(codeAnalyses.timestamp));
   }
 

@@ -1121,12 +1121,14 @@ export async function registerRoutes(
   app.get('/api/code-analyses', async (req, res) => {
     try {
       const fingerprint = typeof req.query.fingerprint === 'string' ? req.query.fingerprint : undefined;
-      const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
-      if (!fingerprint && !sessionId) {
+      const rawSid = req.query.sessionId;
+      const sessionIds: string[] = Array.isArray(rawSid)
+        ? (rawSid as string[]).filter(Boolean)
+        : typeof rawSid === 'string' && rawSid ? [rawSid] : [];
+      if (!fingerprint && sessionIds.length === 0) {
         return res.status(400).json({ message: "fingerprint or sessionId required" });
       }
-      const analyses = await storage.getCodeAnalyses({ fingerprint, sessionId });
-      // Omit codeSnippet from list responses to avoid exposing sensitive code
+      const analyses = await storage.getCodeAnalyses({ fingerprint, sessionIds });
       const safe = analyses.map(({ codeSnippet: _omit, ...rest }) => rest);
       return res.json(safe);
     } catch (err) {

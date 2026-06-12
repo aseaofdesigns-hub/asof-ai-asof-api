@@ -11,17 +11,20 @@ function getOwnerParams(): string {
   const params = new URLSearchParams();
   const fp = localStorage.getItem("asof_fp");
   if (fp) params.set("fingerprint", fp);
-  const sessionId = localStorage.getItem("stripe_session_id");
-  if (sessionId) params.set("sessionId", sessionId);
+  try {
+    const raw = localStorage.getItem("asof_sessions");
+    const sessions: { id: string }[] = raw ? JSON.parse(raw) : [];
+    sessions.forEach(s => { if (s.id) params.append("sessionId", s.id); });
+  } catch { /* ignore */ }
   return params.toString();
 }
 
 export function useCodeAnalyses() {
   const fp = localStorage.getItem("asof_fp") ?? "";
-  const sid = localStorage.getItem("stripe_session_id") ?? "";
+  const rawSessions = localStorage.getItem("asof_sessions") ?? "";
 
   return useQuery<CodeAnalysis[]>({
-    queryKey: ['/api/code-analyses', fp, sid],
+    queryKey: ['/api/code-analyses', fp, rawSessions],
     queryFn: async () => {
       const qs = getOwnerParams();
       if (!qs) return [];
@@ -30,7 +33,7 @@ export function useCodeAnalyses() {
       return res.json();
     },
     refetchInterval: 5000,
-    enabled: !!fp || !!sid,
+    enabled: !!fp || !!rawSessions,
   });
 }
 
