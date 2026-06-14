@@ -691,7 +691,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             <span>Test<br />It<br />Out</span>
           </button>
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Paste code from Cursor, Claude, ChatGPT, or any AI tool — ASOF finds every assumption it made. New here? Hit <span className="text-primary font-medium">Test It Out</span> to see a real example.</p>
+        <p className="text-xs text-muted-foreground">Paste code from Cursor, Claude, ChatGPT, or any AI tool — ASOF finds every assumption it made. New here? Hit <span className="text-yellow-400 font-medium">Test It Out</span> to see a real example.</p>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
