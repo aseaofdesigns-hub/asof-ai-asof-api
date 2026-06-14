@@ -220,7 +220,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="glass-card rounded-2xl p-6 border border-white/5 overflow-hidden flex flex-col min-h-[220px]">
+              <div className="glass-card rounded-2xl p-6 border border-white/5 overflow-hidden flex flex-col min-h-[400px]">
                 <div className="flex items-center justify-between mb-4 shrink-0">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <Database className="w-4 h-4 text-primary" />
@@ -242,7 +242,7 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                <div className="overflow-auto pr-2 custom-scrollbar max-h-[320px]">
+                <div className="overflow-auto pr-2 custom-scrollbar flex-1">
                   <SignalsTable riskFilter={riskFilter} />
                 </div>
               </div>
