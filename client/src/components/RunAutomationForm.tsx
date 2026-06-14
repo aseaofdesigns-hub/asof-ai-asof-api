@@ -685,9 +685,10 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
           <button
             data-testid="button-load-demo"
             onClick={loadExample}
-            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+            className="w-20 h-20 rounded-full border-2 border-yellow-400 bg-yellow-400/10 text-yellow-300 hover:bg-yellow-400/20 transition-all flex items-center justify-center text-center text-[9px] font-bold uppercase tracking-wide leading-snug shrink-0 px-1"
+            style={{ wordBreak: "break-word" }}
           >
-            ✨ Test It Out
+            <span>Test<br />It<br />Out</span>
           </button>
         </CardTitle>
         <p className="text-xs text-muted-foreground">Paste code from Cursor, Claude, ChatGPT, or any AI tool — ASOF finds every assumption it made. New here? Hit <span className="text-primary font-medium">Test It Out</span> to see a real example.</p>
