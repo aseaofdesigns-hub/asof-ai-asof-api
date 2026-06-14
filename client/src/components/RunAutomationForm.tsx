@@ -454,7 +454,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<CodeAnalysisResult | null>(null);
   const [isDemo, setIsDemo] = useState(false);
-  const [sessions, setSessions] = useState<Array<{ id: string; tier: string }>>([]);
+  const [sessions, setSessions] = useState<Array<{ id: string; tier: string; used?: boolean }>>([]);
   const [analysisId, setAnalysisId] = useState<number | null>(null);
   const [freeTrialAvailable, setFreeTrialAvailable] = useState<boolean | null>(null);
   const [showSaferCode, setShowSaferCode] = useState(false);
@@ -499,8 +499,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     }
   }
 
-  // Derived: first queued session (backward compat with existing render logic)
-  const paidSessionId = sessions[0]?.id ?? null;
+  // Derived: first UNUSED queued session
+  const paidSessionId = sessions.find(s => !s.used)?.id ?? null;
 
   function loadSessions() {
     try {
@@ -516,9 +516,11 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
   function consumeSession(id: string) {
     setSessions(prev => {
-      const updated = prev.filter(s => s.id !== id);
+      // Mark as used but keep the ID so past analyses remain visible in history
+      const updated = prev.map(s => s.id === id ? { ...s, used: true } : s);
       localStorage.setItem("asof_sessions", JSON.stringify(updated));
-      if (updated.length > 0) localStorage.setItem("stripe_session_id", updated[0].id);
+      const nextUnused = updated.find(s => !s.used);
+      if (nextUnused) localStorage.setItem("stripe_session_id", nextUnused.id);
       else { localStorage.removeItem("stripe_session_id"); localStorage.removeItem("purchased_tier"); }
       return updated;
     });
@@ -844,16 +846,14 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                 key={tier.id}
                 data-testid={`button-tier-${tier.id}`}
                 onClick={() => initiatePayment(tier.id)}
-                className="flex items-center justify-between w-full p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left group"
+                className="flex items-center w-full p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left group gap-2"
               >
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded bg-white/10">{tier.icon}</div>
-                  <div>
-                    <p className="text-xs font-bold text-white">{tier.name}</p>
-                    <p className="text-[9px] text-muted-foreground">{tier.description}</p>
-                  </div>
+                <div className="p-1.5 rounded bg-white/10 shrink-0">{tier.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-white">{tier.name}</p>
+                  <p className="text-[9px] text-muted-foreground leading-tight">{tier.description}</p>
                 </div>
-                <span className="text-xs font-bold text-white">{tier.price}</span>
+                <span className="text-xs font-bold text-white shrink-0 ml-auto">{tier.price}</span>
               </button>
             ))}
             <div className="text-center pt-1 space-y-0.5">

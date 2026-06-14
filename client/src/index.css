@@ -75,6 +75,14 @@
   }
 }
 
+/* ── Invisible scrollbar utility ─────────────────────────── */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── Global dark scrollbars ───────────────────────────────── */
 * {
   scrollbar-width: thin;

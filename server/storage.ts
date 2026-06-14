@@ -10,6 +10,7 @@ export interface IStorage {
   updatePaymentStatus(sessionId: string, status: string): Promise<Payment>;
   updatePaymentEmail(sessionId: string, email: string): Promise<void>;
   getUnconsumedPaymentsByEmail(email: string): Promise<Payment[]>;
+  getAllPaidPaymentsByEmail(email: string): Promise<Payment[]>;
   markSessionConsumed(sessionId: string): Promise<Payment>;
   hasUsedFreeTrial(fingerprint: string): Promise<boolean>;
   markFreeTrialUsed(fingerprint: string): Promise<void>;
@@ -60,6 +61,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUnconsumedPaymentsByEmail(email: string): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.customerEmail, email.toLowerCase().trim()));
+  }
+
+  async getAllPaidPaymentsByEmail(email: string): Promise<Payment[]> {
     return await db.select().from(payments)
       .where(eq(payments.customerEmail, email.toLowerCase().trim()));
   }
