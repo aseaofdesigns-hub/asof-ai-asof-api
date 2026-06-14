@@ -208,6 +208,7 @@ export default function Dashboard() {
             </motion.div>
 
             <motion.div variants={item} className="lg:col-span-2 flex flex-col gap-6">
+
               <div className="h-[240px] glass-card rounded-2xl p-6 border border-white/5 relative overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -247,7 +248,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* ── Analysis Result Panel sits in the right column, filling the space beside the form ── */}
               <AnimatePresence>
                 {analysisData && (
                   <motion.div

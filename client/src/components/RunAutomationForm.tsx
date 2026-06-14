@@ -12,7 +12,166 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { CodeAnalysisResult } from "@shared/routes";
 import jsPDF from "jspdf";
 
-const EXAMPLE_CODE = `async function chargeCardAndSaveOrder(userId, cartItems, paymentMethodId) {
+const EXAMPLES: Array<{ code: string; prompt: string; result: CodeAnalysisResult }> = [
+  {
+    prompt: "Build a JWT authentication middleware that checks the token on every request",
+    code: `function authenticateUser(req, res, next) {
+  const token = req.headers.authorization.split(' ')[1];
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  req.user = decoded;
+  next();
+}`,
+    result: {
+      risk_level: "CRITICAL",
+      summary: "This AI-generated auth middleware will crash on every unauthenticated request — it calls .split() on an undefined Authorization header with no guard. Anyone who hits an endpoint without a token gets an unhandled TypeError that crashes the request handler instead of a clean 401.",
+      assumptions: [
+        { severity: "HIGH", text: "Assumes req.headers.authorization always exists and is a valid 'Bearer <token>' string. Any missing or malformed header throws a TypeError before any auth check runs." },
+        { severity: "HIGH", text: "Assumes jwt.verify() always returns a decoded user object. If the token is expired or tampered with, jwt.verify() throws — but there's no try/catch, so the error propagates uncaught." },
+        { severity: "MEDIUM", text: "Assumes process.env.JWT_SECRET is always set at runtime. If the env var is missing, jwt.verify() silently accepts tokens signed with an empty string." },
+        { severity: "LOW", text: "Assumes every valid token contains an exp claim. Tokens without expiry are accepted forever — jwt.verify() only rejects expiry if the claim is present." },
+      ],
+      risks: [
+        { severity: "HIGH", text: "No try/catch: jwt.verify() throws JsonWebTokenError, TokenExpiredError, and NotBeforeError — all uncaught, crashing the middleware chain." },
+        { severity: "HIGH", text: "No check for req.headers.authorization existence — calling .split(' ') on undefined throws immediately for every unauthenticated request." },
+        { severity: "MEDIUM", text: "Token split on a single space — a double-space or missing 'Bearer ' prefix silently passes undefined to jwt.verify() with no error." },
+        { severity: "LOW", text: "next() is called synchronously after setting req.user — if jwt.verify() somehow partially succeeds with a malformed payload, the corrupted user object reaches your route handlers." },
+      ],
+      checks: [
+        "Verify a missing Authorization header returns a clean 401 before .split() is ever called",
+        "Confirm JWT_SECRET is set in all environments — a missing secret makes jwt.verify() accept any token",
+        "Test with an expired token — confirm the middleware returns 401, not a 500 crash",
+        "Check whether any issued tokens omit the exp claim — tokens without expiry are accepted forever",
+        "Verify all downstream routes handle req.user being undefined if an error slips through next()",
+      ],
+      suggestions: [
+        {
+          problem: "No Authorization header guard before .split()",
+          why_it_matters: "Any request without an Authorization header throws TypeError: Cannot read properties of undefined — this crashes the server instead of returning 401.",
+          fix: "Add `if (!req.headers.authorization) return res.status(401).json({ error: 'No token' })` before calling .split().",
+        },
+        {
+          problem: "jwt.verify() throws on invalid tokens with no catch",
+          why_it_matters: "Expired, malformed, or tampered tokens throw exceptions that bubble up uncaught, causing 500 errors instead of clean 401 rejections.",
+          fix: "Wrap in try/catch: `try { req.user = jwt.verify(token, secret); next(); } catch { res.status(401).json({ error: 'Invalid token' }); }`",
+        },
+      ],
+      safer_code: `function authenticateUser(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or malformed Authorization header' });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not configured');
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token has expired' });
+    }
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    return res.status(500).json({ error: 'Authentication error' });
+  }
+}`,
+      tier: "lite",
+      gated: true,
+      gated_tier: "pro",
+    },
+  },
+  {
+    prompt: "Build a function that fetches a user profile from our internal API and caches it in Redis for 1 hour",
+    code: `async function getUserProfile(userId) {
+  const cacheKey = \`user:\${userId}\`;
+  const cached = await redis.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  const response = await fetch(\`https://api.internal.com/users/\${userId}\`, {
+    headers: { Authorization: \`Bearer \${process.env.INTERNAL_API_KEY}\` }
+  });
+  const data = await response.json();
+  await redis.setex(cacheKey, 3600, JSON.stringify(data));
+  return data;
+}`,
+    result: {
+      risk_level: "NEEDS_REVIEW",
+      summary: "This AI-generated function fetches user profiles with Redis caching but never checks whether the API call succeeded. A 404 or 500 response gets parsed and cached as valid user data — callers will receive that corrupted payload for a full hour before it expires.",
+      assumptions: [
+        { severity: "HIGH", text: "Assumes the external API always returns a valid JSON user object. A 404 or 500 still returns JSON, which gets parsed and written to cache as if it were real user data." },
+        { severity: "MEDIUM", text: "Assumes redis.get() returns null on a cache miss and never throws. If Redis is unavailable, the function crashes instead of falling back to the live API." },
+        { severity: "MEDIUM", text: "Assumes the cached value is always valid JSON. If a previous write was interrupted, JSON.parse() throws a SyntaxError that crashes the caller with no fallback." },
+        { severity: "LOW", text: "Assumes INTERNAL_API_KEY never rotates. If the key is cycled, stale cached data continues to be served for up to 1 hour after the API starts rejecting requests." },
+      ],
+      risks: [
+        { severity: "HIGH", text: "Response status is never checked — fetch() resolves on 4xx/5xx without throwing, so error payloads get cached and served as valid user data." },
+        { severity: "MEDIUM", text: "No Redis connection error handling — a Redis outage crashes this function before it can fall back to the API, making profiles completely unavailable." },
+        { severity: "MEDIUM", text: "Cache stampede risk: when the key expires for many users simultaneously, all requests hit the external API at once with no lock or single-flight guard." },
+        { severity: "LOW", text: "TTL is hardcoded to 3600s — no way to invalidate a single user's cache if their profile changes before the hour is up." },
+      ],
+      checks: [
+        "Verify what the API returns on a 404 or 500 — confirm it's distinguishable from a valid user object",
+        "Test the code path when Redis is down — confirm it falls back to the API instead of throwing",
+        "Check whether a 1-hour cache TTL is acceptable for your data freshness requirements",
+        "Confirm INTERNAL_API_KEY rotation procedures include a cache flush strategy",
+        "Add response.ok check before parsing to prevent caching error responses",
+      ],
+      suggestions: [
+        {
+          problem: "No HTTP status check before caching the response",
+          why_it_matters: "A 404 'user not found' or 500 error body gets stored in Redis and served to callers as real user data for up to an hour.",
+          fix: "Add `if (!response.ok) throw new Error(\`API \${response.status} for user \${userId}\`)` before calling response.json() — errors won't reach the cache.",
+        },
+        {
+          problem: "No Redis fallback when the cache layer is unavailable",
+          why_it_matters: "Any Redis outage makes user profiles completely unreachable even when the source API is healthy.",
+          fix: "Wrap redis.get() in a try/catch and fall through to the API fetch on any cache error — degrade gracefully instead of crashing.",
+        },
+      ],
+      safer_code: `async function getUserProfile(userId) {
+  const cacheKey = \`user:\${userId}\`;
+
+  // Degrade gracefully if Redis is unavailable
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (cacheErr) {
+    console.warn(\`Cache read failed for \${cacheKey}, falling back to API\`, cacheErr);
+  }
+
+  // Always check HTTP status before trusting the response body
+  const response = await fetch(\`https://api.internal.com/users/\${userId}\`, {
+    headers: { Authorization: \`Bearer \${process.env.INTERNAL_API_KEY}\` }
+  });
+
+  if (!response.ok) {
+    throw new Error(\`API returned \${response.status} for user \${userId}\`);
+  }
+
+  const data = await response.json();
+
+  // Only cache successful responses
+  try {
+    await redis.setex(cacheKey, 3600, JSON.stringify(data));
+  } catch (cacheErr) {
+    console.warn(\`Cache write failed for \${cacheKey}\`, cacheErr);
+  }
+
+  return data;
+}`,
+      tier: "pro",
+      gated: true,
+      gated_tier: "max",
+    },
+  },
+  {
+    prompt: "Build a function that charges a user's card and saves the order to the database",
+    code: `async function chargeCardAndSaveOrder(userId, cartItems, paymentMethodId) {
   // Get user from database
   const user = await db.users.findOne({ id: userId });
   
@@ -44,46 +203,46 @@ const EXAMPLE_CODE = `async function chargeCardAndSaveOrder(userId, cartItems, p
   });
   
   return order;
-}`;
-
-const EXAMPLE_RESULT: CodeAnalysisResult = {
-  risk_level: "RISKY",
-  summary:
-    "This AI-generated function charges a card and creates an order in two separate steps with no transaction safety. If the database write fails after the charge succeeds, you'll have a customer billed but no order record — with no automatic rollback or retry logic.",
-  assumptions: [
-    { severity: "HIGH", text: "Assumes the Stripe charge will always complete before the database write, with no handling for partial failures between the two operations." },
-    { severity: "HIGH", text: "Assumes `user.stripeCustomerId` always exists — if the user has no saved Stripe customer, this silently passes `undefined` to Stripe." },
-    { severity: "MEDIUM", text: "Assumes `total` is already in the correct currency's smallest unit (cents for USD). If `item.price` is in dollars, the charge will be 100× too small." },
-    { severity: "LOW", text: "Assumes `emailService.send` failures are non-critical and can be ignored without alerting the caller." },
-  ],
-  risks: [
-    { severity: "HIGH", text: "No try/catch: any uncaught exception leaves the user charged but without an order, with no compensation or rollback path." },
-    { severity: "HIGH", text: "Race condition: two simultaneous calls for the same cart could create duplicate charges before either order is committed." },
-    { severity: "MEDIUM", text: "No idempotency key on the Stripe charge — retrying on a network timeout will create a second charge." },
-    { severity: "LOW", text: "Order confirmation email is sent synchronously; a slow email provider will block the entire request." },
-  ],
-  checks: [
-    "Verify `item.price` units — confirm they are already in cents, not dollars",
-    "Confirm all users have a `stripeCustomerId` before this function is reachable",
-    "Add a Stripe idempotency key tied to `userId + cartItems` hash",
-    "Wrap the charge + order creation in a try/catch with a Stripe refund in the catch block",
-    "Test what happens when the DB write fails after a successful charge",
-  ],
-  suggestions: [
-    {
-      problem: "No atomic transaction between charge and order creation",
-      why_it_matters: "A server crash between the two steps will bill the customer without creating an order, requiring manual reconciliation.",
-      fix: "Use a database transaction and only confirm the Stripe charge (capture it) after the order row is committed — or store the charge ID first and mark the order as `pending_capture`.",
+}`,
+    result: {
+      risk_level: "RISKY",
+      summary: "This AI-generated function charges a card and creates an order in two separate steps with no transaction safety. If the database write fails after the charge succeeds, you'll have a customer billed but no order record — with no automatic rollback or retry logic.",
+      assumptions: [
+        { severity: "HIGH", text: "Assumes the Stripe charge will always complete before the database write, with no handling for partial failures between the two operations." },
+        { severity: "HIGH", text: "Assumes `user.stripeCustomerId` always exists — if the user has no saved Stripe customer, this silently passes `undefined` to Stripe." },
+        { severity: "MEDIUM", text: "Assumes `total` is already in the correct currency's smallest unit (cents for USD). If `item.price` is in dollars, the charge will be 100× too small." },
+        { severity: "LOW", text: "Assumes `emailService.send` failures are non-critical and can be ignored without alerting the caller." },
+      ],
+      risks: [
+        { severity: "HIGH", text: "No try/catch: any uncaught exception leaves the user charged but without an order, with no compensation or rollback path." },
+        { severity: "HIGH", text: "Race condition: two simultaneous calls for the same cart could create duplicate charges before either order is committed." },
+        { severity: "MEDIUM", text: "No idempotency key on the Stripe charge — retrying on a network timeout will create a second charge." },
+        { severity: "LOW", text: "Order confirmation email is sent synchronously; a slow email provider will block the entire request." },
+      ],
+      checks: [
+        "Verify `item.price` units — confirm they are already in cents, not dollars",
+        "Confirm all users have a `stripeCustomerId` before this function is reachable",
+        "Add a Stripe idempotency key tied to `userId + cartItems` hash",
+        "Wrap the charge + order creation in a try/catch with a Stripe refund in the catch block",
+        "Test what happens when the DB write fails after a successful charge",
+      ],
+      suggestions: [
+        {
+          problem: "No atomic transaction between charge and order creation",
+          why_it_matters: "A server crash between the two steps will bill the customer without creating an order, requiring manual reconciliation.",
+          fix: "Use a database transaction and only confirm the Stripe charge (capture it) after the order row is committed — or store the charge ID first and mark the order as `pending_capture`.",
+        },
+        {
+          problem: "Missing Stripe idempotency key",
+          why_it_matters: "Network retries on a timeout will create duplicate real charges on the customer's card.",
+          fix: "Add `idempotencyKey: \`order-\${userId}-\${cartHash}\`` to every `stripe.charges.create` call.",
+        },
+      ],
+      tier: "max",
+      gated: false,
     },
-    {
-      problem: "Missing Stripe idempotency key",
-      why_it_matters: "Network retries on a timeout will create duplicate real charges on the customer's card.",
-      fix: "Add `idempotencyKey: `order-${userId}-${cartHash}`` to every `stripe.charges.create` call.",
-    },
-  ],
-  tier: "max",
-  gated: false,
-};
+  },
+];
 
 function getFingerprint(): string {
   let fp = localStorage.getItem("asof_fp");
@@ -460,6 +619,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const [showSaferCode, setShowSaferCode] = useState(false);
   const [showExampleResult, setShowExampleResult] = useState(false);
   const [isExampleLoaded, setIsExampleLoaded] = useState(false);
+  const [exampleTier, setExampleTier] = useState<string | null>(null);
+  const currentExampleRef = useRef<typeof EXAMPLES[number] | null>(null);
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [isRecovering, setIsRecovering] = useState(false);
@@ -542,14 +703,20 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   }
 
   const loadExample = () => {
-    setCode(EXAMPLE_CODE);
-    setUserPrompt("Build a function that charges a user's card and saves the order to the database");
+    const pick = EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)];
+    currentExampleRef.current = pick;
+    setCode(pick.code);
+    setUserPrompt(pick.prompt);
+    setExampleTier(pick.result.tier ?? null);
     setIsExampleLoaded(true);
     setResult(null);
     setShowExampleResult(false);
   };
 
-  const showMockResult = () => { onResult?.(EXAMPLE_RESULT, EXAMPLE_CODE); };
+  const showMockResult = () => {
+    const ex = currentExampleRef.current;
+    if (ex) onResult?.(ex.result, ex.code);
+  };
 
   useEffect(() => {
     loadSessions();
@@ -712,10 +879,16 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
           </div>
         )}
 
-        {/* Code input */}
+        {/* Code input — hidden until Test It Out is clicked or user types */}
+        {(isExampleLoaded || code.length > 0) && (
         <div className="space-y-2">
-          <Label htmlFor="code-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <Label htmlFor="code-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
             AI-Generated Code
+            {isExampleLoaded && exampleTier && (
+              <span className="text-yellow-400 font-black tracking-widest">
+                {exampleTier.toUpperCase()}
+              </span>
+            )}
           </Label>
           <Textarea
             id="code-input"
@@ -727,8 +900,10 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             spellCheck={false}
           />
         </div>
+        )}
 
-        {/* Optional prompt */}
+        {/* Optional prompt — hidden until code is present */}
+        {(isExampleLoaded || code.length > 0) && (
         <div className="space-y-2">
           <Label htmlFor="prompt-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             What did you ask the AI to build? <span className="normal-case font-normal text-muted-foreground/60">(optional but improves accuracy)</span>
@@ -743,6 +918,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             spellCheck={false}
           />
         </div>
+        )}
 
         {/* CTA area */}
         {freeTrialAvailable && (

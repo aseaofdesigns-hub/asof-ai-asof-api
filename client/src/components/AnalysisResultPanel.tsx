@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Copy, Check, Maximize2, ChevronRight, Download, AlertTriangle, XCircle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { X, Copy, Check, Maximize2, ChevronRight, Download, AlertTriangle, XCircle, CheckCircle2, ShieldCheck, Lock } from "lucide-react";
 import type { CodeAnalysisResult } from "@shared/routes";
 
 type Tab = "summary" | "assumptions" | "risks" | "suggestions" | "rewrite";
@@ -124,6 +124,18 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
 
   const topFixes = [...risks, ...assumptions].filter(i => i.severity === "HIGH").slice(0, 3);
 
+  const TIER_UNLOCKS: Record<string, Tab[]> = {
+    lite:  ["summary", "assumptions", "risks"],
+    pro:   ["summary", "assumptions", "risks", "suggestions"],
+    max:   ["summary", "assumptions", "risks", "suggestions", "rewrite"],
+    free:  ["summary", "assumptions", "risks"],
+  };
+  const isTabLocked = (tabId: Tab): boolean => {
+    if (!result.gated || !result.tier) return false;
+    const unlocked = TIER_UNLOCKS[result.tier] ?? [];
+    return !unlocked.includes(tabId);
+  };
+
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "summary", label: "Summary" },
     ...(assumptions.length > 0 ? [{ id: "assumptions" as Tab, label: "Assumptions", count: assumptions.length }] : []),
@@ -181,23 +193,31 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
 
         {/* Tab bar */}
         <div className="flex items-center gap-1 px-6 pt-3 border-b border-white/8 overflow-x-auto">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              data-testid={`tab-${t.id}`}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors whitespace-nowrap ${
-                tab === t.id
-                  ? "text-white border-b-2 border-primary -mb-px bg-primary/10"
-                  : "text-muted-foreground hover:text-white"
-              }`}
-            >
-              {t.label}
-              {t.count !== undefined && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-white/60">{t.count}</span>
-              )}
-            </button>
-          ))}
+          {tabs.map(t => {
+            const locked = isTabLocked(t.id);
+            return (
+              <button
+                key={t.id}
+                data-testid={`tab-${t.id}`}
+                onClick={() => setTab(t.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors whitespace-nowrap ${
+                  tab === t.id
+                    ? locked
+                      ? "text-yellow-400/80 border-b-2 border-yellow-500/60 -mb-px bg-yellow-500/8"
+                      : "text-white border-b-2 border-primary -mb-px bg-primary/10"
+                    : locked
+                      ? "text-yellow-500/50 hover:text-yellow-400/70"
+                      : "text-muted-foreground hover:text-white"
+                }`}
+              >
+                {locked ? <Lock className="w-3 h-3 shrink-0" /> : null}
+                {t.label}
+                {t.count !== undefined && !locked && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-white/60">{t.count}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Tab content */}
@@ -299,32 +319,64 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
             {/* ── Suggestions ─────────────────────────────── */}
             {tab === "suggestions" && (
               <motion.div key="suggestions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {suggestions.map((s, i) => (
-                    <button
-                      key={i}
-                      data-testid={`card-suggestion-${i}`}
-                      onClick={() => setModal({ kind: "suggestion", problem: s.problem, why_it_matters: s.why_it_matters, fix: s.fix })}
-                      className="text-left p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/8 hover:border-white/20 transition-all group cursor-pointer space-y-2"
-                    >
-                      <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{s.problem}</p>
-                      <p className="text-xs text-red-300/70 leading-relaxed line-clamp-2">
-                        <span className="font-semibold text-red-400/90">Why: </span>{s.why_it_matters}
-                      </p>
-                      <p className="text-[10px] text-primary/60 font-medium group-hover:text-primary/80 transition-colors">View fix →</p>
-                    </button>
-                  ))}
-                </div>
+                {isTabLocked("suggestions") ? (
+                  <div className="relative rounded-xl overflow-hidden">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 blur-sm pointer-events-none select-none opacity-40">
+                      {suggestions.map((s, i) => (
+                        <div key={i} className="text-left p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                          <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{s.problem}</p>
+                          <p className="text-xs text-red-300/70 leading-relaxed line-clamp-2"><span className="font-semibold text-red-400/90">Why: </span>{s.why_it_matters}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/40 backdrop-blur-[2px] rounded-xl">
+                      <Lock className="w-7 h-7 text-yellow-400" />
+                      <p className="text-sm font-bold text-white">Unlock with ASOF Pro</p>
+                      <p className="text-xs text-white/60 text-center max-w-xs">Suggestion cards with exact fixes are included in Pro ($1.00) and Max ($2.50).</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        data-testid={`card-suggestion-${i}`}
+                        onClick={() => setModal({ kind: "suggestion", problem: s.problem, why_it_matters: s.why_it_matters, fix: s.fix })}
+                        className="text-left p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/8 hover:border-white/20 transition-all group cursor-pointer space-y-2"
+                      >
+                        <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{s.problem}</p>
+                        <p className="text-xs text-red-300/70 leading-relaxed line-clamp-2">
+                          <span className="font-semibold text-red-400/90">Why: </span>{s.why_it_matters}
+                        </p>
+                        <p className="text-[10px] text-primary/60 font-medium group-hover:text-primary/80 transition-colors">View fix →</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             )}
 
             {/* ── Safe Rewrite ─────────────────────────────── */}
             {tab === "rewrite" && result.safer_code && (
               <motion.div key="rewrite" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <CodePanel label="Original AI Code" code={originalCode} />
-                  <CodePanel label="🚦 Safer Suggested Code" code={result.safer_code} accent />
-                </div>
+                {isTabLocked("rewrite") ? (
+                  <div className="relative rounded-xl overflow-hidden">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 blur-sm pointer-events-none select-none opacity-40">
+                      <CodePanel label="Original AI Code" code={originalCode} />
+                      <CodePanel label="🚦 Safer Suggested Code" code={result.safer_code} accent />
+                    </div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/50 backdrop-blur-[2px] rounded-xl">
+                      <Lock className="w-7 h-7 text-yellow-400" />
+                      <p className="text-sm font-bold text-white">Unlock with ASOF Max</p>
+                      <p className="text-xs text-white/60 text-center max-w-xs">The side-by-side safer code rewrite is exclusive to Max ($2.50) — the full fixed version alongside your original.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <CodePanel label="Original AI Code" code={originalCode} />
+                    <CodePanel label="🚦 Safer Suggested Code" code={result.safer_code} accent />
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
