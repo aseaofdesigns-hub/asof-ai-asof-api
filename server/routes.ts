@@ -1120,15 +1120,18 @@ export async function registerRoutes(
   // ── Code analysis history ─────────────────────────────────────────────────
   app.get('/api/code-analyses', async (req, res) => {
     try {
-      const fingerprint = typeof req.query.fingerprint === 'string' ? req.query.fingerprint : undefined;
+      const rawFp = req.query.fingerprint;
+      const fingerprints: string[] = Array.isArray(rawFp)
+        ? (rawFp as string[]).filter(Boolean)
+        : typeof rawFp === 'string' && rawFp ? [rawFp] : [];
       const rawSid = req.query.sessionId;
       const sessionIds: string[] = Array.isArray(rawSid)
         ? (rawSid as string[]).filter(Boolean)
         : typeof rawSid === 'string' && rawSid ? [rawSid] : [];
-      if (!fingerprint && sessionIds.length === 0) {
+      if (fingerprints.length === 0 && sessionIds.length === 0) {
         return res.status(400).json({ message: "fingerprint or sessionId required" });
       }
-      const analyses = await storage.getCodeAnalyses({ fingerprint, sessionIds });
+      const analyses = await storage.getCodeAnalyses({ fingerprints, sessionIds });
       const safe = analyses.map(({ codeSnippet: _omit, ...rest }) => rest);
       return res.json(safe);
     } catch (err) {

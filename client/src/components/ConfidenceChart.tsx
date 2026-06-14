@@ -1,4 +1,4 @@
-import { useCodeAnalyses, useSignals } from "@/hooks/use-automation";
+import { useCodeAnalyses } from "@/hooks/use-automation";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { format } from "date-fns";
 
@@ -19,21 +19,11 @@ function riskColor(score: number): string {
   return "hsl(0, 72%, 51%)";
 }
 
-function confidenceToRiskLabel(confidence: number): string {
-  if (confidence >= 0.85) return "SAFE";
-  if (confidence >= 0.65) return "NEEDS_REVIEW";
-  if (confidence >= 0.4) return "RISKY";
-  return "CRITICAL";
-}
-
 export function ConfidenceChart() {
   const { data: analyses } = useCodeAnalyses();
-  const { data: signals } = useSignals();
 
-  const hasAnalyses = analyses && analyses.length >= 2;
-
-  const chartData = hasAnalyses
-    ? [...analyses!]
+  const chartData = analyses && analyses.length >= 2
+    ? [...analyses]
         .sort((a, b) => new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime())
         .slice(-20)
         .map(a => ({
@@ -41,16 +31,6 @@ export function ConfidenceChart() {
           score: riskToScore(a.riskLevel),
           riskLevel: a.riskLevel,
           summary: a.summary,
-        }))
-    : signals && signals.length >= 2
-    ? [...signals]
-        .sort((a, b) => new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime())
-        .slice(-20)
-        .map(s => ({
-          time: new Date(s.timestamp!).getTime(),
-          score: Math.round(s.confidence * 100),
-          riskLevel: confidenceToRiskLabel(s.confidence),
-          summary: s.insight,
         }))
     : [];
 

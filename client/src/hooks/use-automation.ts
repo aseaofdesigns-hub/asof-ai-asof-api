@@ -9,8 +9,15 @@ type RunAutomationInput = z.infer<typeof api.automation.run.input>;
 
 function getOwnerParams(): string {
   const params = new URLSearchParams();
-  const fp = localStorage.getItem("asof_fp");
-  if (fp) params.set("fingerprint", fp);
+  // Send ALL fingerprints ever used on this browser
+  try {
+    const fps: string[] = JSON.parse(localStorage.getItem("asof_fps") ?? "[]");
+    fps.forEach(fp => { if (fp) params.append("fingerprint", fp); });
+  } catch {
+    const fp = localStorage.getItem("asof_fp");
+    if (fp) params.append("fingerprint", fp);
+  }
+  // Send all session IDs (used and unused)
   try {
     const raw = localStorage.getItem("asof_sessions");
     const sessions: { id: string }[] = raw ? JSON.parse(raw) : [];
@@ -20,11 +27,11 @@ function getOwnerParams(): string {
 }
 
 export function useCodeAnalyses() {
-  const fp = localStorage.getItem("asof_fp") ?? "";
+  const rawFps = localStorage.getItem("asof_fps") ?? localStorage.getItem("asof_fp") ?? "";
   const rawSessions = localStorage.getItem("asof_sessions") ?? "";
 
   return useQuery<CodeAnalysis[]>({
-    queryKey: ['/api/code-analyses', fp, rawSessions],
+    queryKey: ['/api/code-analyses', rawFps, rawSessions],
     queryFn: async () => {
       const qs = getOwnerParams();
       if (!qs) return [];
@@ -33,7 +40,7 @@ export function useCodeAnalyses() {
       return res.json();
     },
     refetchInterval: 5000,
-    enabled: !!fp || !!rawSessions,
+    enabled: !!rawFps || !!rawSessions,
   });
 }
 
