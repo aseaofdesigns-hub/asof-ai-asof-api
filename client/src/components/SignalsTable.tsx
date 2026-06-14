@@ -1,4 +1,4 @@
-import { useCodeAnalyses, useSignals } from "@/hooks/use-automation";
+import { useCodeAnalyses } from "@/hooks/use-automation";
 import { format } from "date-fns";
 import {
   Table,
@@ -28,22 +28,12 @@ function riskToScore(riskLevel: string): number {
   }
 }
 
-function confidenceToRisk(confidence: number): string {
-  if (confidence >= 0.85) return "SAFE";
-  if (confidence >= 0.65) return "NEEDS_REVIEW";
-  if (confidence >= 0.4) return "RISKY";
-  return "CRITICAL";
-}
-
 interface SignalsTableProps {
   riskFilter?: string | null;
 }
 
 export function SignalsTable({ riskFilter }: SignalsTableProps) {
-  const { data: analyses, isLoading: analysesLoading } = useCodeAnalyses();
-  const { data: signals, isLoading: signalsLoading } = useSignals();
-
-  const isLoading = analysesLoading || signalsLoading;
+  const { data: analyses, isLoading } = useCodeAnalyses();
 
   if (isLoading) {
     return (
@@ -54,9 +44,8 @@ export function SignalsTable({ riskFilter }: SignalsTableProps) {
   }
 
   const hasAnalyses = analyses && analyses.length > 0;
-  const hasSignals = signals && signals.length > 0;
 
-  if (!hasAnalyses && !hasSignals) {
+  if (!hasAnalyses) {
     return (
       <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground gap-4">
         <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
@@ -67,85 +56,16 @@ export function SignalsTable({ riskFilter }: SignalsTableProps) {
     );
   }
 
-  if (hasAnalyses) {
-    const filtered = riskFilter
-      ? analyses!.filter(a => a.riskLevel === riskFilter)
-      : analyses!;
+  const filtered = riskFilter
+    ? analyses.filter(a => a.riskLevel === riskFilter)
+    : analyses;
 
-    if (filtered.length === 0) {
-      return (
-        <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground gap-2">
-          <ActivityIcon className="w-8 h-8 opacity-40" />
-          <p className="text-sm">No <span className="font-semibold">{riskFilter?.replace("_", " ")}</span> analyses found</p>
-          <p className="text-xs opacity-60">Try a different filter or run more analyses</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="rounded-xl border border-white/10 overflow-hidden bg-secondary/20">
-        <Table>
-          <TableHeader className="bg-white/5">
-            <TableRow className="border-white/5 hover:bg-transparent">
-              <TableHead className="w-[160px] text-xs font-bold uppercase tracking-wider text-muted-foreground">Timestamp</TableHead>
-              <TableHead className="w-[130px] text-xs font-bold uppercase tracking-wider text-muted-foreground">Risk Level</TableHead>
-              <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Summary</TableHead>
-              <TableHead className="w-[80px] text-xs font-bold uppercase tracking-wider text-muted-foreground">Tier</TableHead>
-              <TableHead className="w-[100px] text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">Score</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((analysis) => {
-              const config = RISK_CONFIG[analysis.riskLevel as keyof typeof RISK_CONFIG] ?? RISK_CONFIG.NEEDS_REVIEW;
-              const score = riskToScore(analysis.riskLevel);
-              return (
-                <TableRow key={analysis.id} className="border-white/5 hover:bg-white/5 transition-colors" data-testid={`row-analysis-${analysis.id}`}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {analysis.timestamp ? format(new Date(analysis.timestamp), "MMM dd, HH:mm:ss") : "-"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={`text-xs font-bold ${config.className}`} data-testid={`badge-risk-${analysis.id}`}>
-                      {config.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-gray-300 text-sm max-w-0">
-                    <p className="truncate" title={analysis.summary}>{analysis.summary}</p>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs text-muted-foreground font-mono uppercase">{analysis.tier}</span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${score > 0.8 ? 'bg-emerald-500' : score > 0.5 ? 'bg-amber-500' : score > 0.3 ? 'bg-orange-500' : 'bg-rose-500'}`}
-                          style={{ width: `${score * 100}%` }}
-                        />
-                      </div>
-                      <span className={`text-xs font-mono font-bold ${score > 0.8 ? 'text-emerald-400' : score > 0.5 ? 'text-amber-400' : score > 0.3 ? 'text-orange-400' : 'text-rose-400'}`}>
-                        {(score * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  }
-
-  // Fallback: show signals data (historical)
-  const filteredSignals = riskFilter
-    ? signals!.filter(s => confidenceToRisk(s.confidence) === riskFilter)
-    : signals!;
-
-  if (filteredSignals.length === 0) {
+  if (filtered.length === 0) {
     return (
       <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground gap-2">
         <ActivityIcon className="w-8 h-8 opacity-40" />
-        <p className="text-sm">No <span className="font-semibold">{riskFilter?.replace("_", " ")}</span> signals found</p>
+        <p className="text-sm">No <span className="font-semibold">{riskFilter?.replace("_", " ")}</span> analyses found</p>
+        <p className="text-xs opacity-60">Try a different filter or run more analyses</p>
       </div>
     );
   }
@@ -156,38 +76,42 @@ export function SignalsTable({ riskFilter }: SignalsTableProps) {
         <TableHeader className="bg-white/5">
           <TableRow className="border-white/5 hover:bg-transparent">
             <TableHead className="w-[160px] text-xs font-bold uppercase tracking-wider text-muted-foreground">Timestamp</TableHead>
-            <TableHead className="w-[130px] text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</TableHead>
-            <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Insight</TableHead>
-            <TableHead className="w-[100px] text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">Confidence</TableHead>
+            <TableHead className="w-[130px] text-xs font-bold uppercase tracking-wider text-muted-foreground">Risk Level</TableHead>
+            <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Summary</TableHead>
+            <TableHead className="w-[80px] text-xs font-bold uppercase tracking-wider text-muted-foreground">Tier</TableHead>
+            <TableHead className="w-[100px] text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">Score</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredSignals.map((signal) => {
-            const riskLevel = confidenceToRisk(signal.confidence);
-            const config = RISK_CONFIG[riskLevel as keyof typeof RISK_CONFIG] ?? RISK_CONFIG.NEEDS_REVIEW;
+          {filtered.map((analysis) => {
+            const config = RISK_CONFIG[analysis.riskLevel as keyof typeof RISK_CONFIG] ?? RISK_CONFIG.NEEDS_REVIEW;
+            const score = riskToScore(analysis.riskLevel);
             return (
-              <TableRow key={signal.id} className="border-white/5 hover:bg-white/5 transition-colors" data-testid={`row-signal-${signal.id}`}>
+              <TableRow key={analysis.id} className="border-white/5 hover:bg-white/5 transition-colors" data-testid={`row-analysis-${analysis.id}`}>
                 <TableCell className="font-mono text-xs text-muted-foreground">
-                  {signal.timestamp ? format(new Date(signal.timestamp), "MMM dd, HH:mm:ss") : "-"}
+                  {analysis.timestamp ? format(new Date(analysis.timestamp), "MMM dd, HH:mm:ss") : "-"}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={`text-xs font-bold ${config.className}`}>
+                  <Badge variant="outline" className={`text-xs font-bold ${config.className}`} data-testid={`badge-risk-${analysis.id}`}>
                     {config.label}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-gray-300 text-sm max-w-0">
-                  <p className="truncate" title={signal.insight}>{signal.insight}</p>
+                  <p className="truncate" title={analysis.summary}>{analysis.summary}</p>
+                </TableCell>
+                <TableCell>
+                  <span className="text-xs text-muted-foreground font-mono uppercase">{analysis.tier}</span>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${signal.confidence > 0.8 ? 'bg-emerald-500' : signal.confidence > 0.5 ? 'bg-amber-500' : signal.confidence > 0.3 ? 'bg-orange-500' : 'bg-rose-500'}`}
-                        style={{ width: `${signal.confidence * 100}%` }}
+                        className={`h-full rounded-full ${score > 0.8 ? 'bg-emerald-500' : score > 0.5 ? 'bg-amber-500' : score > 0.3 ? 'bg-orange-500' : 'bg-rose-500'}`}
+                        style={{ width: `${score * 100}%` }}
                       />
                     </div>
-                    <span className={`text-xs font-mono font-bold ${signal.confidence > 0.8 ? 'text-emerald-400' : signal.confidence > 0.5 ? 'text-amber-400' : signal.confidence > 0.3 ? 'text-orange-400' : 'text-rose-400'}`}>
-                      {(signal.confidence * 100).toFixed(0)}%
+                    <span className={`text-xs font-mono font-bold ${score > 0.8 ? 'text-emerald-400' : score > 0.5 ? 'text-amber-400' : score > 0.3 ? 'text-orange-400' : 'text-rose-400'}`}>
+                      {(score * 100).toFixed(0)}%
                     </span>
                   </div>
                 </TableCell>
