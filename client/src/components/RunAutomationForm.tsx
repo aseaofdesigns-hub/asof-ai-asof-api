@@ -687,38 +687,27 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             onClick={loadExample}
             className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-all"
           >
-            ✨ Try an example
+            ✨ Test It Out
           </button>
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Paste code from Cursor, Claude, ChatGPT, or any AI tool. ASOF finds what it assumed.</p>
+        <p className="text-xs text-muted-foreground">Paste code from Cursor, Claude, ChatGPT, or any AI tool — ASOF finds every assumption it made. New here? Hit <span className="text-primary font-medium">Test It Out</span> to see a real example.</p>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
-        {/* Example CTA banner */}
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-primary/8 border border-primary/20 backdrop-blur-sm">
-          <Sparkles className="w-4 h-4 text-primary shrink-0" />
-          <p className="text-xs text-white/70 flex-1">New here? See what ASOF finds in real AI-generated code.</p>
-          <div className="flex gap-2 shrink-0">
+        {isExampleLoaded && (
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-500/8 border border-orange-500/20">
+            <Eye className="w-4 h-4 text-orange-300 shrink-0" />
+            <p className="text-xs text-white/70 flex-1">Example loaded — scroll down or click below to see the result.</p>
             <button
-              data-testid="button-try-example"
-              onClick={loadExample}
-              className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 transition-all"
+              data-testid="button-see-example-result"
+              onClick={showMockResult}
+              className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/25 transition-all shrink-0"
             >
-              <Sparkles className="w-3 h-3" />
-              Try an example
+              <Eye className="w-3 h-3" />
+              See result
             </button>
-            {isExampleLoaded && (
-              <button
-                data-testid="button-see-example-result"
-                onClick={showMockResult}
-                className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/25 transition-all"
-              >
-                <Eye className="w-3 h-3" />
-                See result
-              </button>
-            )}
           </div>
-        </div>
+        )}
 
         {/* Code input */}
         <div className="space-y-2">
