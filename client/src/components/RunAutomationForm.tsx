@@ -642,6 +642,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const [exampleTier, setExampleTier] = useState<string | null>(null);
   const currentExampleRef = useRef<typeof EXAMPLES[number] | null>(null);
   const [ownerName, setOwnerName] = useState<string>("");
+  const [upgradedFrom, setUpgradedFrom] = useState<string | null>(null);
   const [usedProjectNames, setUsedProjectNames] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("asof_project_names") ?? "[]"); } catch { return []; }
   });
@@ -721,6 +722,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       const res = await fetch(`/api/analysis/${id}?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
+        setUpgradedFrom(prev => result?.tier ?? prev ?? null);
         setResult(data);
         setAnalysisId(id);
         onResult?.(data, code);
@@ -829,6 +831,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     setAnalysisId(null);
     setIsDemo(false);
     setShowSaferCode(false);
+    setUpgradedFrom(null);
     try {
       const body: any = { code, prompt: userPrompt || undefined, fingerprint: getFingerprint() };
       if (!asFree && paidSessionId) body.sessionId = paidSessionId;
@@ -1216,6 +1219,20 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                 <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-[10px]">
                   <span className="text-primary font-bold uppercase tracking-wider">✨ Example analysis — paste your own code above to run a real check</span>
                   <button onClick={() => { setResult(null); setIsDemo(false); setCode(""); setUserPrompt(""); }} className="text-primary/60 hover:text-primary transition-colors font-semibold">Clear</button>
+                </div>
+              )}
+
+              {/* Upgrade confirmation banner */}
+              {upgradedFrom && result?.tier && upgradedFrom !== result.tier && (
+                <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-[10px]">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-emerald-300 font-bold uppercase tracking-wider">
+                      Upgraded: {upgradedFrom.toUpperCase()} → {result.tier.toUpperCase()}
+                    </span>
+                    <span className="text-emerald-400/60 normal-case font-normal">— new features unlocked below</span>
+                  </div>
+                  <button onClick={() => setUpgradedFrom(null)} className="text-emerald-400/40 hover:text-emerald-300 transition-colors font-bold text-[11px]">✕</button>
                 </div>
               )}
 
