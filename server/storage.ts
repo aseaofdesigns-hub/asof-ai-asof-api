@@ -17,6 +17,7 @@ export interface IStorage {
   createCodeAnalysis(analysis: InsertCodeAnalysis): Promise<CodeAnalysis>;
   getCodeAnalyses(filter: { fingerprints?: string[]; sessionIds?: string[] }): Promise<CodeAnalysis[]>;
   getAllCodeAnalyses(): Promise<CodeAnalysis[]>;
+  getAnalysesTrend(): Promise<{ id: number; timestamp: string; riskLevel: string }[]>;
   getAnalysisById(id: number): Promise<CodeAnalysis | undefined>;
   upgradeAnalysisTier(id: number, tier: string): Promise<CodeAnalysis>;
 }
@@ -110,6 +111,19 @@ export class DatabaseStorage implements IStorage {
   async getAllCodeAnalyses(): Promise<CodeAnalysis[]> {
     return await db.select().from(codeAnalyses)
       .orderBy(desc(codeAnalyses.timestamp));
+  }
+
+  async getAnalysesTrend(): Promise<{ id: number; timestamp: string; riskLevel: string }[]> {
+    const rows = await db.select({
+      id: codeAnalyses.id,
+      timestamp: codeAnalyses.timestamp,
+      riskLevel: codeAnalyses.riskLevel,
+    }).from(codeAnalyses).orderBy(desc(codeAnalyses.timestamp));
+    return rows.map(r => ({
+      id: r.id,
+      timestamp: r.timestamp ? r.timestamp.toISOString() : new Date().toISOString(),
+      riskLevel: r.riskLevel ?? "NEEDS_REVIEW",
+    }));
   }
 
   async getAnalysisById(id: number): Promise<CodeAnalysis | undefined> {

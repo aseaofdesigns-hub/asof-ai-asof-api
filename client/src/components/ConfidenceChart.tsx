@@ -1,4 +1,4 @@
-import { useCodeAnalyses, useSignals } from "@/hooks/use-automation";
+import { useAnalysesTrend, useSignals } from "@/hooks/use-automation";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { format, isSameDay } from "date-fns";
 
@@ -38,14 +38,14 @@ function riskColor(score: number): string {
 }
 
 export function ConfidenceChart() {
-  const { data: analyses } = useCodeAnalyses();
+  const { data: trend } = useAnalysesTrend();
   const { data: signals } = useSignals();
 
-  const fromAnalyses = (analyses ?? []).map(a => ({
-    time: new Date(a.timestamp!).getTime(),
-    score: riskToScore(a.riskLevel),
-    riskLevel: a.riskLevel,
-    summary: a.summary ?? "",
+  const fromAnalyses = (trend ?? []).map(a => ({
+    time: new Date(a.timestamp).getTime(),
+    score: riskToScore(a.riskLevel ?? "NEEDS_REVIEW"),
+    riskLevel: a.riskLevel ?? "NEEDS_REVIEW",
+    summary: a.riskLevel ?? "NEEDS_REVIEW",
   }));
 
   const fromSignals = (signals ?? []).map(s => ({

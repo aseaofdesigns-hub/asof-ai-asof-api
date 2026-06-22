@@ -1146,6 +1146,16 @@ export async function registerRoutes(
     }
   });
 
+  // ── Public trend data for the Confidence Chart (no personal data) ─────────
+  app.get('/api/analyses/trend', async (_req, res) => {
+    try {
+      const trend = await storage.getAnalysesTrend();
+      return res.json(trend);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch trend data." });
+    }
+  });
+
   // ── Code analysis history ─────────────────────────────────────────────────
   // Scoped to the caller's own fingerprints + session IDs — never returns other users' data
   app.get('/api/code-analyses', async (req, res) => {

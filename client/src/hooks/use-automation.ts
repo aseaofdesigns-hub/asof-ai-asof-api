@@ -7,15 +7,19 @@ import type { CodeAnalysis } from "@shared/schema";
 // Validated input type for the run mutation
 type RunAutomationInput = z.infer<typeof api.automation.run.input>;
 
+const DEMO_SEED_FP = "asof-demo-seed";
+
 function getOwnerParams(): string {
   const params = new URLSearchParams();
+  // Always include the shared demo fingerprint so seeded/historical analyses are visible
+  params.append("fingerprint", DEMO_SEED_FP);
   // Send ALL fingerprints ever used on this browser
   try {
     const fps: string[] = JSON.parse(localStorage.getItem("asof_fps") ?? "[]");
-    fps.forEach(fp => { if (fp) params.append("fingerprint", fp); });
+    fps.forEach(fp => { if (fp && fp !== DEMO_SEED_FP) params.append("fingerprint", fp); });
   } catch {
     const fp = localStorage.getItem("asof_fp");
-    if (fp) params.append("fingerprint", fp);
+    if (fp && fp !== DEMO_SEED_FP) params.append("fingerprint", fp);
   }
   // Send all session IDs (used and unused)
   try {
@@ -40,6 +44,19 @@ export function useCodeAnalyses() {
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+}
+
+export function useAnalysesTrend() {
+  return useQuery<{ id: number; timestamp: string; riskLevel: string }[]>({
+    queryKey: ['/api/analyses/trend'],
+    queryFn: async () => {
+      const res = await fetch('/api/analyses/trend', { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
 }
 

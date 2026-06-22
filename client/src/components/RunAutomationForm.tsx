@@ -919,7 +919,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         )}
 
         {/* CTA area */}
-        {freeTrialAvailable && (
+        {freeTrialAvailable && !paidSessionId && (
           <Button
             data-testid="button-free-trial"
             onClick={() => runAnalysis(true)}
@@ -1039,7 +1039,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
           </div>
         )}
 
-        {freeTrialAvailable && (
+        {freeTrialAvailable && !paidSessionId && (
           <div className="space-y-3">
             <div className="flex items-center gap-3 py-1">
               <div className="flex-1 h-px bg-white/10" />
