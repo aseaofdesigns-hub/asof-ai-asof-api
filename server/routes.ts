@@ -646,7 +646,7 @@ function gateSeverityByTier(result: any, tier: "lite" | "pro" | "max"): any {
   };
 
   const limits = tierLimits[tier];
-  const isTooSevere = riskLevel === "CRITICAL" && tier !== "max";
+  const isTooSevere = riskLevel === "CRITICAL";
   const isHighGated = riskLevel === "HIGH" && tier === "lite";
 
   if (isTooSevere || isHighGated) {
@@ -1246,8 +1246,10 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
       });
 
       // Consume the payment session so it cannot be reused
+      // Strip the __N suffix (e.g. cs_live_abc__0 → cs_live_abc) before DB lookup
       if (sessionId && tier !== 'free') {
-        await storage.markSessionConsumed(sessionId).catch(() => {});
+        const rawSessionForConsume = sessionId.replace(/__\d+$/, '');
+        await storage.markSessionConsumed(rawSessionForConsume).catch(() => {});
       }
 
       // Gate results by tier

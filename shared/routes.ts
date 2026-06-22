@@ -17,8 +17,8 @@ export const errorSchemas = {
 export const codeAnalysisResultSchema = z.object({
   risk_level: z.enum(['SAFE', 'NEEDS_REVIEW', 'RISKY', 'CRITICAL']),
   summary: z.string(),
-  assumptions: z.array(z.object({ text: z.string(), severity: z.enum(['LOW', 'MEDIUM', 'HIGH']) })),
-  risks: z.array(z.object({ text: z.string(), severity: z.enum(['LOW', 'MEDIUM', 'HIGH']) })).optional(),
+  assumptions: z.array(z.object({ text: z.string(), severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']) })),
+  risks: z.array(z.object({ text: z.string(), severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']) })).optional(),
   checks: z.array(z.string()).optional(),
   safer_code: z.string().optional(),
   suggestions: z.array(z.object({

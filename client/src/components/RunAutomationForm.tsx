@@ -1144,7 +1144,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               </div>
 
               {/* Full analysis detail lives in the panel below */}
-              {(result.assumptions?.length > 0 || result.risks?.length > 0 || result.checks?.length || result.suggestions?.length || result.safer_code) && (
+              {((result.assumptions?.length ?? 0) > 0 || (result.risks?.length ?? 0) > 0 || result.checks?.length || result.suggestions?.length || result.safer_code) && (
                 <p className="text-[10px] text-primary/60 font-medium flex items-center gap-1">
                   <span>Full report with all details shown below</span>
                   <span className="text-primary/40">↓</span>

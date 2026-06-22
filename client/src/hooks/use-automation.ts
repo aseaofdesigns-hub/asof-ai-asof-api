@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Signal } from "@shared/routes";
+import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import type { CodeAnalysis } from "@shared/schema";
