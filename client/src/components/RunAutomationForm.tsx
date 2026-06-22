@@ -1115,25 +1115,46 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               )}
 
               {/* Risk badge + summary */}
-              <div className={`rounded-xl border p-4 space-y-2 ${risk.bg}`}>
+              <div className={`rounded-xl border p-4 space-y-3 ${risk.bg}`}>
+                {/* Row 1: verdict + tier */}
                 <div className="flex items-center gap-2 flex-wrap">
+                  {risk.icon}
+                  <span className={`font-bold text-sm ${risk.color}`}>{risk.label}</span>
                   {result.tier && (
                     <span className="text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">
                       {result.tier} tier
                     </span>
                   )}
-                  {(result.assumptions?.length ?? 0) > 0 && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-amber-500/10 border-amber-500/30 text-amber-300">
-                      {result.assumptions!.length} assumption{result.assumptions!.length !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                  {(result.risks?.length ?? 0) > 0 && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-red-500/10 border-red-500/30 text-red-300">
-                      {result.risks!.length} risk{result.risks!.length !== 1 ? "s" : ""}
-                    </span>
-                  )}
                 </div>
-                <p className="text-xs text-white/80 leading-relaxed">{result.summary}</p>
+
+                {/* Section definitions */}
+                {(() => {
+                  const tier = result.tier ?? "free";
+                  const hasPro = tier === "pro" || tier === "max";
+                  const hasMax = tier === "max";
+                  const sections = [
+                    { label: "Summary", desc: "Overall risk verdict and why.", color: "text-sky-300 bg-sky-500/10 border-sky-500/30", included: true },
+                    { label: "Assumptions", desc: `${(result.assumptions?.length ?? 0)} things the AI took for granted.`, color: "text-amber-300 bg-amber-500/10 border-amber-500/30", included: true },
+                    { label: "What Could Break", desc: `${(result.risks?.length ?? 0)} real failure scenarios.`, color: "text-red-300 bg-red-500/10 border-red-500/30", included: true },
+                    { label: "Verify Checklist", desc: "Steps to confirm before you ship.", color: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30", included: hasPro },
+                    { label: "Suggestions", desc: "Fix cards for each issue found.", color: "text-blue-300 bg-blue-500/10 border-blue-500/30", included: hasPro },
+                    { label: "Safe Rewrite", desc: "A safer drop-in version of your code.", color: "text-purple-300 bg-purple-500/10 border-purple-500/30", included: hasMax },
+                  ];
+                  return (
+                    <div className="space-y-1.5">
+                      {sections.map((s) => (
+                        <div key={s.label} className="flex items-start gap-2">
+                          <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${s.included ? s.color : "text-white/20 bg-white/5 border-white/10"}`}>
+                            {s.label}
+                          </span>
+                          <span className={`text-[10px] leading-snug mt-0.5 ${s.included ? "text-white/60" : "text-white/25"}`}>
+                            {s.included ? s.desc : "Locked — upgrade to unlock"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Full analysis detail lives in the panel below */}
