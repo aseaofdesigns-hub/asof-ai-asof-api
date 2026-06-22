@@ -1096,11 +1096,39 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             ))}
 
             {/* Browser credit warning */}
-            <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
-              <span className="text-amber-400 shrink-0 mt-0.5">⚠</span>
-              <p className="text-[9px] text-amber-200/70 leading-relaxed">
-                <span className="font-bold text-amber-300">Credits are stored in this browser only.</span> Clearing your cache or switching devices may lose them. We don't issue refunds — but email <a href="mailto:Support@asofai.com" className="underline hover:text-amber-200">Support@asofai.com</a> with proof of purchase and we'll restore your credits.
-              </p>
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 space-y-2">
+              <div className="flex items-start gap-2.5">
+                <span className="text-amber-400 shrink-0 mt-0.5">⚠</span>
+                <p className="text-[9px] text-amber-200/70 leading-relaxed">
+                  <span className="font-bold text-amber-300">Credits are stored in this browser only.</span> Clearing your cache or switching devices may lose them. We don't issue refunds — but email{" "}
+                  <a
+                    href={`mailto:Support@asofai.com?subject=Credit%20Restore%20Request&body=Session%20ID(s)%3A%20${encodeURIComponent(sessions.map(s => s.id.replace(/__\d+$/, '')).filter((v, i, a) => a.indexOf(v) === i).join(', '))}`}
+                    className="underline hover:text-amber-200"
+                  >Support@asofai.com</a>{" "}
+                  with proof of purchase and we'll restore your credits.
+                </p>
+              </div>
+              {sessions.length > 0 && (
+                <div className="pl-6 space-y-1">
+                  <p className="text-[8px] text-amber-400/60 font-bold uppercase tracking-wider">Your Session ID{sessions.length > 1 ? "s" : ""} — save this for support:</p>
+                  {sessions.map((s, i) => {
+                    const rawId = s.id.replace(/__\d+$/, '');
+                    const short = rawId.length > 24 ? rawId.slice(0, 12) + '…' + rawId.slice(-8) : rawId;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => { navigator.clipboard.writeText(rawId); }}
+                        title="Click to copy"
+                        className="flex items-center gap-1.5 font-mono text-[8px] text-amber-300/80 hover:text-amber-200 transition-colors"
+                      >
+                        <span>{short}</span>
+                        <span className="text-amber-400/40 text-[7px]">{s.used ? "(used)" : `(${s.tier})`}</span>
+                        <span className="text-amber-400/40 text-[7px]">📋</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
