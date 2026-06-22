@@ -1,0 +1,76 @@
+Risk Level: NEEDS REVIEW 62% safe
+The code assumes `userId` is always safe to interpolate into a URL and that every response is a successful JSON
+payload. Without validation and response checks, it can fail unexpectedly or request the wrong endpoint.
+Fix These First
+1
+If `userId` contains `/`, `?`, `#`, spaces, or other special characters, the request URL
+may be malformed or target an unintended route.
+2
+If the server returns `404`, `500`, or another non-2xx status, `response.json()` may still run and either throw or
+return an error payload that the caller mistakes for valid user data.
+3
+If the server returns HTML, an empty body, or plain text instead of JSON, `response.json()` will throw a parsing
+error.
+What the AI Assumed
+HIGH The AI assumed `userId` is always defined, non-empty, and safe to insert directly
+into `/api/users/${userId}` without encoding.
+HIGH The AI assumed the server always returns a JSON response body.
+HIGH The AI assumed the HTTP response status is successful and does not need to be checked with
+`response.ok`.
+MEDIUM The AI assumed network failures, timeouts, aborted requests, and server errors do not need explicit
+handling.
+MEDIUM The AI assumed callers know how to handle thrown parsing or network errors because the function does not
+normalize or enrich errors.
+LOW The AI assumed `fetch` is available in the runtime environment.
+What Could Break
+ASOF.ai — asofai.com | Support@asofai.com Page 1
+ASOF.ai — AI Code Analysis Report (continued)
+HIGH If `userId` contains `/`, `?`, `#`, spaces, or other special characters, the request
+URL may be malformed or target an unintended route.
+HIGH If the server returns `404`, `500`, or another non-2xx status, `response.json()` may still run and either throw
+or return an error payload that the caller mistakes for valid user data.
+HIGH If the server returns HTML, an empty body, or plain text instead of JSON, `response.json()` will throw a
+parsing error.
+MEDIUM On network failure, DNS issues, CORS failure, or aborted requests, the function rejects without context,
+making debugging and user-facing handling harder.
+MEDIUM If `userId` is `null`, `undefined`, or an empty string, the request may go to `/api/users/null`,
+`/api/users/undefined`, or `/api/users/`, which can hide upstream bugs.
+Verify Checklist
+[ ] Verify what values `userId` can contain and whether it should be restricted to a numeric
+ID, UUID, or non-empty string.
+[ ] Verify the API contract for `/api/users/:id`, especially whether error responses are JSON and what shape successful
+responses have.
+[ ] Verify whether non-2xx responses should throw errors or return structured error objects to callers.
+[ ] Verify the runtime supports `fetch`, `AbortController`, and `Headers` if this code runs outside modern browsers.
+[ ] Verify whether requests need authentication headers, credentials, or CSRF protection not shown in this snippet.
+[ ] Verify whether callers need timeout behavior to avoid hanging requests.
+Suggestion Cards
+Unvalidated `userId` in URL
+Why it matters:
+Direct interpolation into the path can create invalid or unintended URLs when `userId`
+contains reserved characters or is empty.
+Fix:
+Validate that `userId` is present and convert it to a trimmed string, then use
+`encodeURIComponent(normalizedUserId)` before building the URL.
+No HTTP status check
+Why it matters:
+`fetch` only rejects on network errors, not on `404` or `500`, so callers may treat error responses as valid data.
+Fix:
+Check `response.ok` and throw a structured error that includes `response.status`, `response.statusText`, and any available response body.
+ASOF.ai — asofai.com | Support@asofai.com Page 2
+ASOF.ai — AI Code Analysis Report (continued)
+Blind JSON parsing
+Why it matters:
+If the API returns HTML, text, or an empty body, `response.json()` throws and the error gives little context.
+Fix:
+Inspect `response.headers.get('content-type')` before parsing and provide a clear error when the payload is not JSON.
+No timeout or abort handling
+Why it matters:
+Requests can hang indefinitely or be aborted, and the current function gives callers no control or useful error messages.
+Fix:
+Accept an optional `signal`, add a timeout via `AbortController`, and wrap abort/network failures with userId-specific context.
+No response shape validation
+Why it matters:
+A successful JSON response could still be the wrong type, such as an array or error object, leading to downstream runtime bugs.
+Fix:
+Validate that the parsed result is a non-null object and add stricter schema checks if the user payload format is known.
