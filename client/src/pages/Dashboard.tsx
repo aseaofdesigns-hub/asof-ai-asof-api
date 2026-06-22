@@ -209,14 +209,14 @@ export default function Dashboard() {
 
             <motion.div variants={item} className="lg:col-span-2 flex flex-col gap-6">
 
-              <div className="h-[240px] glass-card rounded-2xl p-6 border border-white/5 relative overflow-hidden">
+              <div className="h-[270px] glass-card rounded-2xl p-6 border border-white/5 relative">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <Activity className="w-4 h-4 text-primary" />
                     Confidence Trends
                   </h3>
                 </div>
-                <div className="h-[160px] w-full">
+                <div className="h-[190px] w-full">
                   <ConfidenceChart />
                 </div>
               </div>

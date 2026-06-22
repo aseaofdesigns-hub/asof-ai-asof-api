@@ -73,7 +73,7 @@ export function ConfidenceChart() {
   return (
     <div className="h-full w-full min-h-[200px]">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 20 }}>
           <defs>
             <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
