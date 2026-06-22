@@ -1117,11 +1117,19 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               {/* Risk badge + summary */}
               <div className={`rounded-xl border p-4 space-y-2 ${risk.bg}`}>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {risk.icon}
-                  <span className={`font-bold text-sm ${risk.color}`}>{risk.label}</span>
                   {result.tier && (
                     <span className="text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">
                       {result.tier} tier
+                    </span>
+                  )}
+                  {(result.assumptions?.length ?? 0) > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-amber-500/10 border-amber-500/30 text-amber-300">
+                      {result.assumptions!.length} assumption{result.assumptions!.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {(result.risks?.length ?? 0) > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-red-500/10 border-red-500/30 text-red-300">
+                      {result.risks!.length} risk{result.risks!.length !== 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
