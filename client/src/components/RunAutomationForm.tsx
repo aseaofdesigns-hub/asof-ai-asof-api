@@ -951,7 +951,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               disabled={isRunning || !code.trim()}
               className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
             >
-              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code {paidSessionTier && <span className="opacity-70 font-normal">({paidSessionTier.toUpperCase()} tier)</span>}</>}
+              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
             </Button>
             {sessions.length > 1 && (
               <p className="text-center text-[10px] text-emerald-400/80 font-medium">
