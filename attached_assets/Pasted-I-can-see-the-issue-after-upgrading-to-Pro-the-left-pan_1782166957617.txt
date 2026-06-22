@@ -1,0 +1,266 @@
+I can see the issue — after upgrading to Pro, the left panel still shows "LITE TIER" and the features are still locked. Here's the code to fix all of this:
+
+**1. Upgrade banner component** — `client/components/UpgradeBanner.tsx`
+
+```tsx
+import { motion } from "framer-motion";
+
+interface UpgradeBannerProps {
+  fromTier: "lite" | "pro";
+  toTier: "pro" | "max";
+}
+
+export function UpgradeBanner({ fromTier, toTier }: UpgradeBannerProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 mb-4"
+    >
+      <p className="text-center text-sm font-bold text-red-400 tracking-wide uppercase">
+        ✦ Upgraded: {fromTier.toUpperCase()} → {toTier.toUpperCase()} ✦
+      </p>
+    </motion.div>
+  );
+}
+```
+
+**2. Tier features logic** — `client/lib/tierFeatures.ts`
+
+```ts
+export type Tier = "lite" | "pro" | "max";
+
+export const TIER_FEATURES: Record<Tier, { label: string; locked: boolean }[]> = {
+  lite: [
+    { label: "SUMMARY", locked: false },
+    { label: "ASSUMPTIONS", locked: false },
+    { label: "WHAT COULD BREAK", locked: false },
+    { label: "VERIFY CHECKLIST", locked: true },
+    { label: "SUGGESTIONS", locked: true },
+    { label: "SAFE REWRITES", locked: true },
+  ],
+  pro: [
+    { label: "SUMMARY", locked: false },
+    { label: "ASSUMPTIONS", locked: false },
+    { label: "WHAT COULD BREAK", locked: false },
+    { label: "VERIFY CHECKLIST", locked: false },
+    { label: "SUGGESTIONS", locked: false },
+    { label: "SAFE REWRITES", locked: true },
+  ],
+  max: [
+    { label: "SUMMARY", locked: false },
+    { label: "ASSUMPTIONS", locked: false },
+    { label: "WHAT COULD BREAK", locked: false },
+    { label: "VERIFY CHECKLIST", locked: false },
+    { label: "SUGGESTIONS", locked: false },
+    { label: "SAFE REWRITES", locked: false },
+  ],
+};
+
+export const TIER_ORDER: Tier[] = ["lite", "pro", "max"];
+
+export const UPGRADE_PRICES: Record<string, number> = {
+  "lite->pro": 0.50,
+  "lite->max": 2.00,
+  "pro->max": 2.00,
+};
+
+export function getNextUpgrade(currentTier: Tier): Tier | null {
+  const idx = TIER_ORDER.indexOf(currentTier);
+  if (idx >= TIER_ORDER.length - 1) return null;
+  return TIER_ORDER[idx + 1];
+}
+
+export function getAvailableUpgrades(currentTier: Tier): Tier[] {
+  const idx = TIER_ORDER.indexOf(currentTier);
+  return TIER_ORDER.slice(idx + 1);
+}
+```
+
+**3. Updated "Your Tier Includes" section** — `client/components/TierIncludes.tsx`
+
+```tsx
+import { TIER_FEATURES, type Tier } from "../lib/tierFeatures";
+
+interface TierIncludesProps {
+  activeTier: Tier;
+}
+
+export function TierIncludes({ activeTier }: TierIncludesProps) {
+  const features = TIER_FEATURES[activeTier];
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+      <h3 className="text-sm font-semibold text-white/60 mb-3 uppercase tracking-wider">
+        Your Tier Includes:
+      </h3>
+      <div className="space-y-2">
+        {features.map((f) => (
+          <div key={f.label} className="flex items-center justify-between text-sm">
+            <span
+              className={`rounded px-2 py-0.5 text-xs font-bold ${
+                f.locked
+                  ? "bg-white/10 text-white/30"
+                  : "bg-orange-500/20 text-orange-400"
+              }`}
+            >
+              {f.label}
+            </span>
+            <span className={f.locked ? "text-white/30 text-xs" : "text-white/60 text-xs"}>
+              {f.locked ? "Locked — upgrade to unlock" : getFeatureDescription(f.label)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getFeatureDescription(label: string): string {
+  const map: Record<string, string> = {
+    SUMMARY: "Overall risk verdict and why.",
+    ASSUMPTIONS: "Things the AI took for granted.",
+    "WHAT COULD BREAK": "Real failure scenarios.",
+    "VERIFY CHECKLIST": "Step-by-step verification list.",
+    SUGGESTIONS: "Actionable fix cards.",
+    "SAFE REWRITES": "Safer code side-by-side.",
+  };
+  return map[label] || "";
+}
+```
+
+**4. Updated upgrade box** — `client/components/UpgradeBox.tsx`
+
+```tsx
+import { getNextUpgrade, UPGRADE_PRICES, type Tier } from "../lib/tierFeatures";
+
+interface UpgradeBoxProps {
+  currentTier: Tier;
+  originalTier: Tier; // what they originally paid for
+  onUpgrade: (toTier: Tier) => void;
+}
+
+export function UpgradeBox({ currentTier, originalTier, onUpgrade }: UpgradeBoxProps) {
+  const nextTier = getNextUpgrade(currentTier);
+
+  // Already at max — no upgrade available
+  if (!nextTier) return null;
+
+  const priceKey = `${originalTier}->${nextTier}` as keyof typeof UPGRADE_PRICES;
+  const price = UPGRADE_PRICES[priceKey] ?? UPGRADE_PRICES[`${currentTier}->${nextTier}`];
+
+  const tierLabels: Record<Tier, string> = {
+    lite: "Lite",
+    pro: "Pro — Verify checklist + suggestion cards",
+    max: "Max — Safer code rewrite side-by-side",
+  };
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+      <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+        <span>⬆</span> Upgrade this analysis — pay only the difference
+      </p>
+      <button
+        onClick={() => onUpgrade(nextTier)}
+        className="w-full flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-white hover:bg-green-500/20 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-green-400">⊕</span>
+          {tierLabels[nextTier]}
+        </span>
+        <span className="text-green-400 font-bold">+${price.toFixed(2)}</span>
+      </button>
+      <p className="text-xs text-white/30 mt-2 text-center">
+        Same analysis, instantly expanded — no re-run needed.
+      </p>
+    </div>
+  );
+}
+```
+
+**5. Wire it all together in your analysis results page** — update wherever you render the left panel:
+
+```tsx
+import { useState } from "react";
+import { UpgradeBanner } from "./components/UpgradeBanner";
+import { TierIncludes } from "./components/TierIncludes";
+import { UpgradeBox } from "./components/UpgradeBox";
+import type { Tier } from "./lib/tierFeatures";
+
+// Inside your results component:
+const [originalTier] = useState<Tier>("lite"); // what they first paid for
+const [activeTier, setActiveTier] = useState<Tier>("lite");
+const [upgradedFrom, setUpgradedFrom] = useState<Tier | null>(null);
+
+function handleUpgrade(toTier: Tier) {
+  // 1. Call your Stripe checkout API for the upgrade price
+  // 2. On success:
+  setUpgradedFrom(activeTier);
+  setActiveTier(toTier);
+}
+
+// In your JSX (left panel):
+return (
+  <div className="space-y-4">
+    {/* Show upgrade banner if they upgraded */}
+    {upgradedFrom && (
+      <UpgradeBanner fromTier={upgradedFrom} toTier={activeTier} />
+    )}
+
+    {/* Tier badge — shows CURRENT tier, not original */}
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-white/60">Active credit</span>
+      <span className="rounded-full border border-purple-500 px-3 py-1 text-xs font-bold text-purple-400 uppercase">
+        {activeTier} Tier
+      </span>
+    </div>
+
+    {/* Features — unlocked based on ACTIVE tier */}
+    <TierIncludes activeTier={activeTier} />
+
+    {/* Upgrade box — only shows NEXT tier, or nothing if at max */}
+    <UpgradeBox
+      currentTier={activeTier}
+      originalTier={originalTier}
+      onUpgrade={handleUpgrade}
+    />
+  </div>
+);
+```
+
+**6. On the results panel (right side)**, unlock the tabs based on `activeTier`:
+
+```tsx
+// In your results/tabs area:
+const tabsUnlocked = {
+  summary: true, // always
+  assumptions: true, // always
+  whatCouldBreak: true, // always
+  verifyChecklist: activeTier === "pro" || activeTier === "max",
+  suggestions: activeTier === "pro" || activeTier === "max",
+  safeRewrite: activeTier === "max",
+};
+
+// For each tab:
+<button
+  disabled={!tabsUnlocked.verifyChecklist}
+  className={tabsUnlocked.verifyChecklist ? "text-white" : "text-white/30 cursor-not-allowed"}
+>
+  Verify Checklist
+</button>
+```
+
+---
+
+### Summary of what this fixes
+
+| Issue | Fix |
+|---|---|
+| Tier badge still shows "LITE" after upgrade | Badge now reads from `activeTier` state |
+| Features stay locked after upgrade | `TierIncludes` renders based on active tier |
+| No upgrade confirmation shown | Red `UpgradeBanner` shows "LITE → PRO" |
+| Upgrade box shows all options | Only shows the single next tier available |
+| At Max, upgrade box still visible | Returns `null` when at max tier |
+| Right panel tabs stay locked | Tabs unlock based on `activeTier` |
+
+Drop these into Replit and let me know if the upgrade flow works correctly.
