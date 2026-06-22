@@ -1,0 +1,38 @@
+ASOF.ai
+AI Code Assumption Analysis Report
+Generated: 6/22/2026, 2:29:38 PM LITE TIER
+Risk Level: NEEDS REVIEW 62% safe
+The function is short and likely works for simple happy-path inputs, but it silently assumes `amount` is always a valid
+finite number and `currency` is always a supported ISO 4217 code. Invalid or unexpected inputs can throw at runtime
+or produce misleading formatting.
+Fix These First
+1
+If `currency` is invalid, malformed, or unsupported, `new Intl.NumberFormat(..., {
+currency })` can throw a `RangeError` at runtime.
+2
+If `amount` is `null`, `undefined`, `NaN`, `Infinity`, a numeric string, or another unexpected type, the output may be
+incorrect or may expose inconsistent coercion behavior.
+3
+The AI assumed `amount` is always a valid finite numeric value acceptable to
+`Intl.NumberFormat.prototype.format`.
+What the AI Assumed
+HIGH The AI assumed `amount` is always a valid finite numeric value acceptable to
+`Intl.NumberFormat.prototype.format`.
+HIGH The AI assumed `currency` is always a valid supported currency code such as `USD`, `EUR`, or `JPY`.
+MEDIUM The AI assumed formatting should always use the `en-US` locale regardless of the user's locale or product
+requirements.
+LOW The AI assumed it is acceptable to instantiate a new `Intl.NumberFormat` object on every call without
+performance concerns.
+LOW The AI assumed callers want default currency formatting behavior, including automatic fraction digits based
+on the currency.
+What Could Break
+HIGH If `currency` is invalid, malformed, or unsupported, `new Intl.NumberFormat(..., {
+currency })` can throw a `RangeError` at runtime.
+ASOF.ai — asofai.com | Support@asofai.com Page 1
+ASOF.ai — AI Code Analysis Report (continued)
+HIGH If `amount` is `null`, `undefined`, `NaN`, `Infinity`, a numeric string, or another unexpected type, the output
+may be incorrect or may expose inconsistent coercion behavior.
+MEDIUM Using hard-coded `en-US` can display amounts in a format that is wrong for users in other locales, such as
+decimal separators, grouping, and currency symbol placement.
+LOW Creating a formatter for every call can become inefficient in hot paths such as rendering tables, invoices, or
+lists with many amounts
