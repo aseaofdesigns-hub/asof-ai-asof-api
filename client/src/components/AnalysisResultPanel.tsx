@@ -139,7 +139,7 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "summary", label: "Summary" },
     ...(assumptions.length > 0 ? [{ id: "assumptions" as Tab, label: "Assumptions", count: assumptions.length }] : []),
-    ...(risks.length > 0 ? [{ id: "risks" as Tab, label: "Risks", count: risks.length }] : []),
+    ...(risks.length > 0 ? [{ id: "risks" as Tab, label: "What Could Break", count: risks.length }] : []),
     ...(suggestions.length > 0 ? [{ id: "suggestions" as Tab, label: "Suggestions", count: suggestions.length }] : []),
     ...(result.safer_code ? [{ id: "rewrite" as Tab, label: "Safe Rewrite" }] : []),
   ];
@@ -243,7 +243,7 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     { label: "Assumptions", count: assumptions.length, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-                    { label: "Risks", count: risks.length, color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
+                    { label: "What Could Break", count: risks.length, color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
                     { label: "Suggestions", count: suggestions.length, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
                     { label: "Safe Rewrite", count: result.safer_code ? 1 : 0, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
                   ].map(s => (
