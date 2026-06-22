@@ -751,7 +751,6 @@ export async function registerRoutes(
 
   app.post(api.payments.create.path, async (req, res) => {
     try {
-      const stripe = await getUncachableStripeClient();
       const { tier, analysisId, fromTier } = api.payments.create.input.parse(req.body);
 
       const TIER_CENTS: Record<string, number> = { free: 0, lite: 50, pro: 100, max: 250 };
@@ -760,6 +759,21 @@ export async function registerRoutes(
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers.host || req.headers.origin?.replace(/^https?:\/\//, '');
       const baseUrl = req.headers.origin || `${protocol}://${host}`;
+
+      // ── Dev test mode bypass ──────────────────────────────────────────────
+      // Set ALLOW_DEV_PAYMENTS=true to skip Stripe and test the full flow for free.
+      if (process.env.ALLOW_DEV_PAYMENTS === 'true') {
+        const devSessionId = `dev_test_${tier}_${Date.now()}`;
+        const diffCents = analysisId && fromTier && fromTier !== tier
+          ? Math.max(0, TIER_CENTS[tier] - (TIER_CENTS[fromTier] ?? 0))
+          : TIER_CENTS[tier] ?? 50;
+        await storage.createPayment({ stripeSessionId: devSessionId, amount: diffCents, tier, analysisId });
+        await storage.updatePaymentStatus(devSessionId, 'paid');
+        const redirectUrl = `${baseUrl}/verify?session_id=${devSessionId}`;
+        return res.json({ url: redirectUrl });
+      }
+
+      const stripe = await getUncachableStripeClient();
 
       // ── Upgrade payment (diff pricing) ────────────────────────────────────
       if (analysisId && fromTier && fromTier !== tier) {
@@ -876,6 +890,20 @@ export async function registerRoutes(
     const { sessionId } = req.params;
 
     try {
+      // ── Dev test mode: skip Stripe, read directly from DB ────────────────
+      if (sessionId.startsWith('dev_test_')) {
+        const payment = await storage.getPaymentBySessionId(sessionId);
+        if (payment && payment.status === 'paid') {
+          return res.json({
+            status: 'paid',
+            tier: payment.tier,
+            amount: payment.amount,
+            analysisId: payment.analysisId ?? null,
+          });
+        }
+        return res.status(404).json({ message: 'Dev test session not found' });
+      }
+
       const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       const payment = await storage.getPaymentBySessionId(sessionId);

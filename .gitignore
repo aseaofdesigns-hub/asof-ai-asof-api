@@ -3,6 +3,6 @@ dist
 .DS_Store
 server/public
 vite.config.ts.*
-*.tar.gzasof_backup.sql
+*.tar.gz
+*.sql
 ChatGPT
-asof_backup.sql~
