@@ -16,6 +16,7 @@ export interface IStorage {
   markFreeTrialUsed(fingerprint: string): Promise<void>;
   createCodeAnalysis(analysis: InsertCodeAnalysis): Promise<CodeAnalysis>;
   getCodeAnalyses(filter: { fingerprints?: string[]; sessionIds?: string[] }): Promise<CodeAnalysis[]>;
+  getAllCodeAnalyses(): Promise<CodeAnalysis[]>;
   getAnalysisById(id: number): Promise<CodeAnalysis | undefined>;
   upgradeAnalysisTier(id: number, tier: string): Promise<CodeAnalysis>;
 }
@@ -103,6 +104,11 @@ export class DatabaseStorage implements IStorage {
     if (sessionIds.length > 0) conditions.push(inArray(codeAnalyses.sessionId, sessionIds));
     return await db.select().from(codeAnalyses)
       .where(or(...conditions))
+      .orderBy(desc(codeAnalyses.timestamp));
+  }
+
+  async getAllCodeAnalyses(): Promise<CodeAnalysis[]> {
+    return await db.select().from(codeAnalyses)
       .orderBy(desc(codeAnalyses.timestamp));
   }
 

@@ -30,9 +30,7 @@ export function useCodeAnalyses() {
   return useQuery<CodeAnalysis[]>({
     queryKey: ['/api/code-analyses'],
     queryFn: async () => {
-      const qs = getOwnerParams();
-      if (!qs) return [];
-      const res = await fetch(`/api/code-analyses?${qs}`, { credentials: "include" });
+      const res = await fetch('/api/code-analyses', { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
