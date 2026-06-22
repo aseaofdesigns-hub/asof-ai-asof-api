@@ -825,6 +825,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     try {
       const body: any = { code, prompt: userPrompt || undefined, fingerprint: getFingerprint() };
       if (!asFree && paidSessionId) body.sessionId = paidSessionId;
+      if (!asFree && ownerName.trim()) body.projectName = ownerName.trim();
 
       const res = await fetch('/api/analyze-code', {
         method: 'POST',

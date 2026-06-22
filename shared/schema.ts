@@ -10,6 +10,7 @@ export const codeAnalyses = pgTable("code_analyses", {
   tier: text("tier").notNull(),
   fingerprint: text("fingerprint"),
   sessionId: text("session_id"),
+  projectName: text("project_name"),
   fullData: jsonb("full_data"),
   timestamp: timestamp("timestamp").defaultNow(),
 });

@@ -1182,7 +1182,7 @@ export async function registerRoutes(
   // ── AI-powered code analysis ──────────────────────────────────────────────
   app.post('/api/analyze-code', analyzeLimiter, async (req, res) => {
     try {
-      const { code, prompt: userPrompt, sessionId, fingerprint, tier: explicitTier } = req.body;
+      const { code, prompt: userPrompt, sessionId, fingerprint, tier: explicitTier, projectName } = req.body;
 
       if (!code || typeof code !== 'string' || code.trim().length < 10) {
         return res.status(400).json({ message: "Please paste at least 10 characters of code to analyze." });
@@ -1282,6 +1282,7 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
         tier,
         fingerprint: fingerprint ?? null,
         sessionId: sessionId ?? null,
+        projectName: (typeof projectName === 'string' && projectName.trim()) ? projectName.trim() : null,
         fullData: analysis,
       });
 
