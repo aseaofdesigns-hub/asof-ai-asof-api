@@ -1380,12 +1380,20 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
       const record = await storage.getAnalysisById(id);
       if (!record) return res.status(404).json({ message: "Analysis not found" });
 
-      // Ownership check — must match fingerprint or sessionId
-      // sessionId in DB may have __N suffix (e.g. cs_live_abc__0); strip it for comparison
-      const ownsViaTierprint = fingerprint && record.fingerprint === fingerprint;
+      // Ownership check — must match fingerprint, original sessionId, or a paid upgrade payment for this analysis
+      const ownsViaFingerprint = fingerprint && record.fingerprint === fingerprint;
       const recordRawSession = record.sessionId ? record.sessionId.replace(/__\d+$/, '') : null;
-      const ownsViaSession = sessionId && (record.sessionId === sessionId || recordRawSession === sessionId);
-      if (!ownsViaTierprint && !ownsViaSession) {
+      const ownsViaOriginalSession = sessionId && (record.sessionId === sessionId || recordRawSession === sessionId);
+      // upgradeSessionId = the Stripe session ID of the upgrade payment (different from the original analysis session)
+      const upgradeSessionId = req.query.upgradeSessionId as string | undefined;
+      let ownsViaUpgradePayment = false;
+      if (upgradeSessionId && !ownsViaFingerprint && !ownsViaOriginalSession) {
+        const rawUpgrade = upgradeSessionId.replace(/__\d+$/, '');
+        const [upgPayment] = await db.select().from(payments)
+          .where(eq(payments.stripeSessionId, rawUpgrade));
+        ownsViaUpgradePayment = !!(upgPayment && upgPayment.analysisId === id && upgPayment.status === 'paid');
+      }
+      if (!ownsViaFingerprint && !ownsViaOriginalSession && !ownsViaUpgradePayment) {
         return res.status(403).json({ message: "Not authorized to view this analysis" });
       }
 

@@ -714,11 +714,11 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     });
   }
 
-  async function fetchUpgradedAnalysis(id: number, sessionId?: string) {
+  async function fetchUpgradedAnalysis(id: number, upgradeSessionId?: string) {
     const fp = getFingerprint();
     try {
       const params = new URLSearchParams({ fingerprint: fp });
-      if (sessionId) params.set("sessionId", sessionId);
+      if (upgradeSessionId) params.set("upgradeSessionId", upgradeSessionId);
       const res = await fetch(`/api/analysis/${id}?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();

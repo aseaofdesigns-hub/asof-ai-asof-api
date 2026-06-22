@@ -110,7 +110,7 @@ export default function VerifyPayment() {
                 </h2>
                 <p className="text-muted-foreground">
                   {isUpgrade
-                    ? `Your analysis has been upgraded to ${data.tier ? TIER_LABELS[data.tier] ?? data.tier : "the next tier"}.`
+                    ? `Upgraded to ${data.tier ? (data.tier.charAt(0).toUpperCase() + data.tier.slice(1)) : "next tier"}${data.amount ? ` — you paid $${(data.amount / 100).toFixed(2)}` : ""}.`
                     : data.tier && TIER_LABELS[data.tier]
                     ? `Your ${TIER_LABELS[data.tier]} plan is now active.`
                     : data.amount
