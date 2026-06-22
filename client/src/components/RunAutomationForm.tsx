@@ -315,7 +315,7 @@ const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"
   <line x1="23" y1="19" x2="26" y2="19" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round"/>
 </svg>`;
 
-export async function downloadReport(result: CodeAnalysisResult, _code: string) {
+export async function downloadReport(result: CodeAnalysisResult, _code: string, projectName?: string) {
   const iconPng = await svgToPng(FAVICON_SVG, 64);
 
   const doc = new jsPDF();
@@ -405,7 +405,16 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string) 
   doc.setTextColor(180, 150, 230);
   doc.text("AI Code Assumption Analysis Report", iconPng ? M + 16 : M, 26);
   doc.setTextColor(130, 120, 160);
-  doc.text(`Generated: ${now.toLocaleString()}`, iconPng ? M + 16 : M, 34);
+  if (projectName) {
+    doc.setTextColor(200, 180, 255);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Project: ${projectName}`, iconPng ? M + 16 : M, 33);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(130, 120, 160);
+    doc.text(`Generated: ${now.toLocaleString()}`, iconPng ? M + 16 : M, 40);
+  } else {
+    doc.text(`Generated: ${now.toLocaleString()}`, iconPng ? M + 16 : M, 34);
+  }
   if (result.tier) {
     const tierLabel = result.tier.toUpperCase() + " TIER";
     doc.setFillColor(168, 85, 247, 0.3);
@@ -606,7 +615,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string) 
   doc.save(`asof-report-${Date.now()}.pdf`);
 }
 
-export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalysisResult, code: string) => void }) {
+export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalysisResult, code: string, projectName?: string) => void }) {
   const queryClient = useQueryClient();
   const [code, setCode] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
@@ -632,7 +641,10 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const [isExampleLoaded, setIsExampleLoaded] = useState(false);
   const [exampleTier, setExampleTier] = useState<string | null>(null);
   const currentExampleRef = useRef<typeof EXAMPLES[number] | null>(null);
-  const [ownerName, setOwnerName] = useState<string>(() => localStorage.getItem("asof_owner_name") ?? "");
+  const [ownerName, setOwnerName] = useState<string>("");
+  const [usedProjectNames, setUsedProjectNames] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("asof_project_names") ?? "[]"); } catch { return []; }
+  });
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [isRecovering, setIsRecovering] = useState(false);
@@ -827,8 +839,18 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       setResult(data);
       if (data.analysisId) setAnalysisId(data.analysisId);
       if (asFree) setFreeTrialAvailable(false);
-      if (paidSessionId && !asFree) consumeSession(paidSessionId);
-      onResult?.(data, code);
+      const savedProjectName = ownerName.trim() || undefined;
+      if (paidSessionId && !asFree) {
+        consumeSession(paidSessionId);
+        // Save project name to used list and clear field
+        if (savedProjectName) {
+          const updated = [...usedProjectNames, savedProjectName.toLowerCase()];
+          setUsedProjectNames(updated);
+          localStorage.setItem("asof_project_names", JSON.stringify(updated));
+          setOwnerName("");
+        }
+      }
+      onResult?.(data, code, savedProjectName);
       void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
       toast({ title: "Analysis complete", description: `Risk level: ${data.risk_level?.replace("_", " ")}` });
     } catch (err) {
@@ -946,30 +968,45 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
         {paidSessionId && (
           <div className="space-y-2">
-            {/* Required name field */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-white/50">
-                Your Name <span className="text-red-400">*</span>
-              </label>
-              <input
-                data-testid="input-owner-name"
-                type="text"
-                value={ownerName}
-                onChange={e => {
-                  setOwnerName(e.target.value);
-                  localStorage.setItem("asof_owner_name", e.target.value);
-                }}
-                placeholder="Enter your name to continue"
-                className="w-full h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-primary/50 focus:bg-white/8 transition-colors"
-              />
-              {!ownerName.trim() && (
-                <p className="text-[9px] text-amber-400/70">Required before running an analysis.</p>
-              )}
-            </div>
+            {/* Required project name field */}
+            {(() => {
+              const isDuplicate = ownerName.trim() && usedProjectNames.includes(ownerName.trim().toLowerCase());
+              return (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/50">
+                    Project Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    data-testid="input-owner-name"
+                    type="text"
+                    value={ownerName}
+                    onChange={e => setOwnerName(e.target.value)}
+                    placeholder="e.g. Acme Auth Service, PayFlow v2…"
+                    className={`w-full h-9 px-3 rounded-lg border text-sm text-white placeholder:text-white/25 focus:outline-none transition-colors ${isDuplicate ? "border-red-500/60 bg-red-950/20 focus:border-red-400" : "border-white/10 bg-white/5 focus:border-primary/50"}`}
+                  />
+                  {isDuplicate ? (
+                    <p className="text-[9px] text-red-400">
+                      You already analyzed a project with this name. Each run needs a unique project name (e.g. add a version or date).
+                    </p>
+                  ) : !ownerName.trim() ? (
+                    <p className="text-[9px] text-white/35">
+                      Use your actual project name — it appears on the PDF and helps track your audits.
+                    </p>
+                  ) : (
+                    <p className="text-[9px] text-emerald-400/70">✓ Good to go</p>
+                  )}
+                  {usedProjectNames.length > 0 && (
+                    <p className="text-[9px] text-white/20 truncate">
+                      Previously analyzed: {usedProjectNames.map(n => n).join(", ")}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <Button
               data-testid="button-analyze"
               onClick={() => runAnalysis(false)}
-              disabled={isRunning || !code.trim() || !ownerName.trim()}
+              disabled={isRunning || !code.trim() || !ownerName.trim() || !!usedProjectNames.includes(ownerName.trim().toLowerCase())}
               className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
             >
               {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}

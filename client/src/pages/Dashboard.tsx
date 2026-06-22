@@ -40,7 +40,7 @@ export default function Dashboard() {
   const { data: analyses } = useCodeAnalyses();
   const [paidSessionId, setPaidSessionId] = useState<string | null>(null);
   const [riskFilter, setRiskFilter] = useState<RiskLevel | null>(null);
-  const [analysisData, setAnalysisData] = useState<{ result: CodeAnalysisResult; code: string } | null>(null);
+  const [analysisData, setAnalysisData] = useState<{ result: CodeAnalysisResult; code: string; projectName?: string } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("stripe_session_id");
@@ -204,7 +204,7 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <motion.div variants={item} className="lg:col-span-1">
-              <RunAutomationForm onResult={(result, code) => setAnalysisData({ result, code })} />
+              <RunAutomationForm onResult={(result, code, projectName) => setAnalysisData({ result, code, projectName })} />
             </motion.div>
 
             <motion.div variants={item} className="lg:col-span-2 flex flex-col gap-6">
@@ -261,7 +261,7 @@ export default function Dashboard() {
                       result={analysisData.result}
                       originalCode={analysisData.code}
                       onDismiss={() => setAnalysisData(null)}
-                      onDownloadPDF={() => void downloadReport(analysisData.result, analysisData.code)}
+                      onDownloadPDF={() => void downloadReport(analysisData.result, analysisData.code, analysisData.projectName)}
                     />
                   </motion.div>
                 )}
