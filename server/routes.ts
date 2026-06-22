@@ -762,8 +762,14 @@ export async function registerRoutes(
       const baseUrl = req.headers.origin || `${protocol}://${host}`;
 
       // ── Dev test mode bypass ──────────────────────────────────────────────
-      // Set ALLOW_DEV_PAYMENTS=true to skip Stripe and test the full flow for free.
-      if (process.env.ALLOW_DEV_PAYMENTS === 'true') {
+      // Auto-enabled on preview (*.replit.dev) and non-production environments.
+      // Set ALLOW_DEV_PAYMENTS=false to force real Stripe even in preview.
+      const reqHost = (req.headers.host ?? '');
+      const isPreviewHost = reqHost.includes('.replit.dev') || reqHost.includes('localhost');
+      const devPaymentsEnabled =
+        process.env.ALLOW_DEV_PAYMENTS === 'true' ||
+        (process.env.ALLOW_DEV_PAYMENTS !== 'false' && (isPreviewHost || process.env.NODE_ENV !== 'production'));
+      if (devPaymentsEnabled) {
         const devSessionId = `dev_test_${tier}_${Date.now()}`;
         const diffCents = analysisId && fromTier && fromTier !== tier
           ? Math.max(0, TIER_CENTS[tier] - (TIER_CENTS[fromTier] ?? 0))
@@ -895,6 +901,9 @@ export async function registerRoutes(
       if (sessionId.startsWith('dev_test_')) {
         const payment = await storage.getPaymentBySessionId(sessionId);
         if (payment && payment.status === 'paid') {
+          if (payment.analysisId) {
+            await storage.upgradeAnalysisTier(payment.analysisId, payment.tier);
+          }
           return res.json({
             status: 'paid',
             tier: payment.tier,
