@@ -1017,6 +1017,19 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                 </div>
               );
             })()}
+            {/* Active tier badge */}
+            {paidSessionTier && (
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+                <span className="text-[10px] text-white/40 font-medium">Active credit</span>
+                <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                  paidSessionTier === 'max' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                  paidSessionTier === 'pro' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                  'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                }`}>
+                  {paidSessionTier} tier
+                </span>
+              </div>
+            )}
             <Button
               data-testid="button-analyze"
               onClick={() => runAnalysis(false)}

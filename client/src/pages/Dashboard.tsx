@@ -111,6 +111,7 @@ export default function Dashboard() {
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-bold ${hColor.text}`}>Code Health Score</p>
                   <p className="text-xs text-white/60 mt-0.5">{healthCallout(healthScore, riskCounts)}</p>
+                  <p className="text-[10px] text-white/30 mt-0.5">Averaged across your analysis history — not a live scan of pasted code.</p>
                 </div>
                 <div className="w-32 h-2 rounded-full bg-white/10 overflow-hidden shrink-0">
                   <motion.div
