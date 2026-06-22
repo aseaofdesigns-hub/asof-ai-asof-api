@@ -1,0 +1,57 @@
+const bcrypt = require('bcrypt');
+
+app.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+
+    if (typeof username !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ success: false, error: 'Invalid request body' });
+    }
+
+    const normalizedUsername = username.trim();
+
+    if (!normalizedUsername || !password) {
+      return res.status(400).json({ success: false, error: 'Username and password are required' });
+    }
+
+    if (normalizedUsername.length > 100 || password.length > 200) {
+      return res.status(400).json({ success: false, error: 'Input too long' });
+    }
+
+    const query = 'SELECT id, username, password_hash FROM users WHERE username = ? LIMIT 1';
+
+    db.query(query, [normalizedUsername], async (err, results) => {
+      if (err) {
+        console.error('Login query failed:', err);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+      }
+
+      if (!Array.isArray(results) || results.length === 0) {
+        return res.status(401).json({ success: false, error: 'Invalid username or password' });
+      }
+
+      const user = results[0];
+
+      if (typeof user.password_hash !== 'string' || !user.password_hash) {
+        console.error('User record missing password_hash for username:', normalizedUsername);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+      }
+
+      const passwordMatches = await bcrypt.compare(password, user.password_hash);
+
+      if (!passwordMatches) {
+        return res.status(401).json({ success: false, error: 'Invalid username or password' });
+      }
+
+      req.session.user = {
+        id: user.id,
+        username: user.username
+      };
+
+      return res.status(200).json({ success: true, user: { id: user.id, username: user.username } });
+    });
+  } catch (error) {
+    console.error('Unexpected login error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
