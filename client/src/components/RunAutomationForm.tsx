@@ -1116,16 +1116,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
               {/* Risk badge + summary */}
               <div className={`rounded-xl border p-4 space-y-3 ${risk.bg}`}>
-                {/* Row 1: verdict + tier */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {risk.icon}
-                  <span className={`font-bold text-sm ${risk.color}`}>{risk.label}</span>
-                  {result.tier && (
-                    <span className="text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">
-                      {result.tier} tier
-                    </span>
-                  )}
-                </div>
+                {/* Row 1: header */}
+                <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Your Tier Includes:</p>
 
                 {/* Section definitions */}
                 {(() => {
