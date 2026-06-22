@@ -27,11 +27,8 @@ function getOwnerParams(): string {
 }
 
 export function useCodeAnalyses() {
-  const rawFps = localStorage.getItem("asof_fps") ?? localStorage.getItem("asof_fp") ?? "";
-  const rawSessions = localStorage.getItem("asof_sessions") ?? "";
-
   return useQuery<CodeAnalysis[]>({
-    queryKey: ['/api/code-analyses', rawFps, rawSessions],
+    queryKey: ['/api/code-analyses'],
     queryFn: async () => {
       const qs = getOwnerParams();
       if (!qs) return [];
@@ -40,7 +37,9 @@ export function useCodeAnalyses() {
       return res.json();
     },
     refetchInterval: 5000,
-    enabled: !!rawFps || !!rawSessions,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
