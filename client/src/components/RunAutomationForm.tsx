@@ -619,7 +619,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
   doc.save(`asof-report-${Date.now()}.pdf`);
 }
 
-export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalysisResult, code: string, projectName?: string) => void }) {
+export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalysisResult, code: string, projectName?: string, upgradedFrom?: string) => void }) {
   const queryClient = useQueryClient();
   const [code, setCode] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
@@ -734,7 +734,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         setActiveTier(newTier);
         setResult(data);
         setAnalysisId(id);
-        onResult?.(data, code);
+        onResult?.(data, code, undefined, prevTier);
         void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
         toast({ title: "Upgrade applied!", description: `Now showing ${newTier.toUpperCase()} tier results.` });
       } else {

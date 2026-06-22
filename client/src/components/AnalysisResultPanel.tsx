@@ -110,9 +110,10 @@ interface Props {
   originalCode: string;
   onDismiss: () => void;
   onDownloadPDF: () => void;
+  upgradedFrom?: string;
 }
 
-export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloadPDF }: Props) {
+export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloadPDF, upgradedFrom }: Props) {
   const [tab, setTab] = useState<Tab>("summary");
   const [modal, setModal] = useState<ModalData>(null);
 
@@ -153,6 +154,24 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
         transition={{ duration: 0.4 }}
         className="glass-card rounded-2xl border border-white/10 overflow-hidden"
       >
+        {/* Upgrade confirmation banner */}
+        {upgradedFrom && result.tier && upgradedFrom !== result.tier && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="px-6 py-2.5 border-b border-emerald-500/20 bg-emerald-500/10 flex items-center gap-2.5"
+          >
+            <span className="text-emerald-400 text-sm">✦</span>
+            <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
+              Upgraded: {upgradedFrom.toUpperCase()} → {result.tier.toUpperCase()}
+            </span>
+            <span className="text-[11px] text-emerald-400/60 ml-1">
+              — new sections unlocked below
+            </span>
+          </motion.div>
+        )}
+
         {/* Header */}
         <div className={`px-6 py-4 border-b border-white/10 flex items-center justify-between ${rs.bg}`}>
           <div className="flex items-center gap-3">
