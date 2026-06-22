@@ -158,14 +158,16 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
           <div className="flex items-center gap-3">
             {rs.icon}
             <div>
-              <h2 className={`text-base font-bold ${rs.text}`}>
-                {result.risk_level.replace("_", " ")}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className={`text-base font-bold ${rs.text}`}>
+                  {result.risk_level.replace("_", " ")}
+                </h2>
                 {result.tier && (
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-white/10 border border-white/15 text-muted-foreground align-middle">
-                    {result.tier}
+                  <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-white/10 border border-white/15 text-muted-foreground">
+                    {result.tier} tier
                   </span>
                 )}
-              </h2>
+              </div>
               <p className="text-xs text-white/60 mt-0.5 max-w-2xl leading-snug">{result.summary}</p>
             </div>
           </div>
