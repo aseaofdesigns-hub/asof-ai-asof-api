@@ -926,7 +926,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             disabled={isRunning || !code.trim()}
             className="w-full h-11 font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30"
           >
-            {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</> : <><Zap className="mr-2 h-4 w-4" />Analyze Free (One Trial)</>}
+            {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</> : <><Zap className="mr-2 h-4 w-4" />Analyze Free <span className="opacity-70 font-normal">(One Trial · 2 assumptions)</span></>}
           </Button>
         )}
 
