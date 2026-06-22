@@ -5,6 +5,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import { securityHeaders, corsPolicy, apiLimiter, apiNotFound } from "./middleware/security";
 
 const app = express();
 const httpServer = createServer(app);
@@ -76,6 +77,16 @@ async function initStripe() {
 
 (async () => {
   await initStripe();
+
+  // Trust Replit's reverse proxy so rate-limit can identify IPs correctly
+  app.set("trust proxy", 1);
+
+  // Security headers + CORS — first, before everything
+  app.use(securityHeaders);
+  app.use(corsPolicy);
+
+  // Rate limit all /api/ routes (webhook is excluded inside the limiter)
+  app.use("/api/", apiLimiter);
 
   app.post(
     '/api/stripe/webhook',

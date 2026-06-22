@@ -1,0 +1,68 @@
+import type { Request, Response, NextFunction } from "express";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-06-20",
+});
+
+// Stripe webhooks need the RAW body, not parsed JSON
+// This must be applied BEFORE express.json() on the webhook route
+export function stripeWebhookHandler(webhookSecret: string) {
+  return async (req: Request, res: Response) => {
+    const sig = req.headers["stripe-signature"];
+
+    if (!sig) {
+      return res.status(400).json({ error: "Missing stripe-signature" });
+    }
+
+    let event: Stripe.Event;
+
+    try {
+      // req.body must be the raw buffer here
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (err: any) {
+      console.error("Webhook signature verification failed:", err.message);
+      return res.status(400).json({ error: "Invalid signature" });
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        // Mark payment as complete in your DB
+        // Example:
+        // await db.insert(paymentSessions).values({
+        //   token: crypto.randomUUID(),
+        //   stripeSessionId: session.id,
+        //   tier: session.metadata?.tier || 'lite',
+        //   used: false,
+        //   expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
+        // });
+
+        console.log(`Payment completed: ${session.id}, tier: ${session.metadata?.tier}`);
+        break;
+      }
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    res.json({ received: true });
+  };
+}
+
+// Server-side tier price validation — never trust the client
+const TIER_PRICES: Record<string, { priceId: string; amount: number }> = {
+  lite: { priceId: process.env.STRIPE_PRICE_LITE!, amount: 50 },
+  pro:  { priceId: process.env.STRIPE_PRICE_PRO!,  amount: 100 },
+  max:  { priceId: process.env.STRIPE_PRICE_MAX!,  amount: 250 },
+};
+
+export function validateTier(req: Request, res: Response, next: NextFunction) {
+  const { tier } = req.body;
+  if (!tier || !TIER_PRICES[tier]) {
+    return res.status(400).json({ error: "Invalid tier. Must be lite, pro, or max." });
+  }
+  (req as any).tierConfig = TIER_PRICES[tier];
+  next();
+}

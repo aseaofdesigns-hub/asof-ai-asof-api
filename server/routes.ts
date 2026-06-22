@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
+import { analyzeLimiter, apiNotFound } from "./middleware/security";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
@@ -1157,7 +1158,7 @@ export async function registerRoutes(
   });
 
   // ── AI-powered code analysis ──────────────────────────────────────────────
-  app.post('/api/analyze-code', async (req, res) => {
+  app.post('/api/analyze-code', analyzeLimiter, async (req, res) => {
     try {
       const { code, prompt: userPrompt, sessionId, fingerprint, tier: explicitTier } = req.body;
 
@@ -1413,6 +1414,9 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
       res.status(500).json({ message: err?.message ?? "Lookup failed" });
     }
   });
+
+  // 404 for unknown /api/* routes — must come after all real routes, before SPA catch-all
+  app.use(apiNotFound);
 
   return httpServer;
 }

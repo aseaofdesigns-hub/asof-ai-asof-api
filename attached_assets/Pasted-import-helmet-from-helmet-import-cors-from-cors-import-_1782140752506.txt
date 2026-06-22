@@ -1,0 +1,102 @@
+import helmet from "helmet";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
+import type { Request, Response, NextFunction } from "express";
+
+// --- Helmet: removes X-Powered-By, adds security headers ---
+export const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.stripe.com"],
+      frameSrc: ["https://js.stripe.com"],
+    },
+  },
+});
+
+// --- CORS: only your domain ---
+export const corsPolicy = cors({
+  origin: "https://asofai.com",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+});
+
+// --- Rate limiting: general API ---
+export const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please try again later." },
+});
+
+// --- Rate limiting: strict for validate endpoint ---
+export const validateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Validation rate limit reached. Please wait." },
+});
+
+// --- Payment auth middleware ---
+// This is the critical one: blocks /api/validate without a paid session
+export function requirePaidSession(req: Request, res: Response, next: NextFunction) {
+  // Option A: Check a session token/cookie set after Stripe checkout completes
+  const sessionToken = req.headers.authorization?.replace("Bearer ", "") 
+    || req.cookies?.asofai_session;
+
+  if (!sessionToken) {
+    return res.status(401).json({ 
+      error: "Payment required. Please complete checkout first." 
+    });
+  }
+
+  // Validate the token against your database
+  // Replace this with your actual session/payment lookup
+  validatePaymentSession(sessionToken)
+    .then((session) => {
+      if (!session || session.used) {
+        return res.status(403).json({ 
+          error: "Session expired or already used." 
+        });
+      }
+      // Attach session to request for downstream use
+      (req as any).paidSession = session;
+      next();
+    })
+    .catch(() => {
+      return res.status(500).json({ error: "Session validation failed." });
+    });
+}
+
+// Replace this with your actual Drizzle query
+async function validatePaymentSession(token: string) {
+  // Example using Drizzle:
+  // const [session] = await db
+  //   .select()
+  //   .from(paymentSessions)
+  //   .where(
+  //     and(
+  //       eq(paymentSessions.token, token),
+  //       eq(paymentSessions.used, false),
+  //       gt(paymentSessions.expiresAt, new Date())
+  //     )
+  //   );
+  // return session;
+  
+  // PLACEHOLDER — replace with real DB lookup
+  return null; // returns null = unauthorized until you wire up the DB
+}
+
+// --- 404 for unknown API routes (put AFTER all real API routes, BEFORE SPA catch-all) ---
+export function apiNotFound(req: Request, res: Response, next: NextFunction) {
+  if (req.path.startsWith("/api/")) {
+    return res.status(404).json({ error: "Endpoint not found" });
+  }
+  next();
+}
