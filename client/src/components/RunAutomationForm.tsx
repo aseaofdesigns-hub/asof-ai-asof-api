@@ -632,6 +632,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const [isExampleLoaded, setIsExampleLoaded] = useState(false);
   const [exampleTier, setExampleTier] = useState<string | null>(null);
   const currentExampleRef = useRef<typeof EXAMPLES[number] | null>(null);
+  const [ownerName, setOwnerName] = useState<string>(() => localStorage.getItem("asof_owner_name") ?? "");
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [isRecovering, setIsRecovering] = useState(false);
@@ -945,10 +946,30 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
         {paidSessionId && (
           <div className="space-y-2">
+            {/* Required name field */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-white/50">
+                Your Name <span className="text-red-400">*</span>
+              </label>
+              <input
+                data-testid="input-owner-name"
+                type="text"
+                value={ownerName}
+                onChange={e => {
+                  setOwnerName(e.target.value);
+                  localStorage.setItem("asof_owner_name", e.target.value);
+                }}
+                placeholder="Enter your name to continue"
+                className="w-full h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-primary/50 focus:bg-white/8 transition-colors"
+              />
+              {!ownerName.trim() && (
+                <p className="text-[9px] text-amber-400/70">Required before running an analysis.</p>
+              )}
+            </div>
             <Button
               data-testid="button-analyze"
               onClick={() => runAnalysis(false)}
-              disabled={isRunning || !code.trim()}
+              disabled={isRunning || !code.trim() || !ownerName.trim()}
               className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
             >
               {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
@@ -1102,7 +1123,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                 <p className="text-[9px] text-amber-200/70 leading-relaxed">
                   <span className="font-bold text-amber-300">Credits are stored in this browser only.</span> Clearing your cache or switching devices may lose them. We don't issue refunds — but email{" "}
                   <a
-                    href={`mailto:Support@asofai.com?subject=Credit%20Restore%20Request&body=Session%20ID(s)%3A%20${encodeURIComponent(sessions.map(s => s.id.replace(/__\d+$/, '')).filter((v, i, a) => a.indexOf(v) === i).join(', '))}`}
+                    href={`mailto:Support@asofai.com?subject=Credit%20Restore%20Request&body=Name%3A%20${encodeURIComponent(ownerName || 'Not provided')}%0ASession%20ID(s)%3A%20${encodeURIComponent(sessions.map(s => s.id.replace(/__\d+$/, '')).filter((v, i, a) => a.indexOf(v) === i).join(', '))}`}
                     className="underline hover:text-amber-200"
                   >Support@asofai.com</a>{" "}
                   with proof of purchase and we'll restore your credits.
