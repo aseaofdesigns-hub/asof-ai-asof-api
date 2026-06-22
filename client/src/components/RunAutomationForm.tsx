@@ -879,8 +879,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
           </div>
         )}
 
-        {/* Code input — hidden until Test It Out is clicked or user types */}
-        {(isExampleLoaded || code.length > 0) && (
+        {/* Code input — always visible */}
         <div className="space-y-2">
           <Label htmlFor="code-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
             AI-Generated Code
@@ -900,7 +899,6 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             spellCheck={false}
           />
         </div>
-        )}
 
         {/* Optional prompt — hidden until code is present */}
         {(isExampleLoaded || code.length > 0) && (
