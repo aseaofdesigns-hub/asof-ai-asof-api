@@ -674,7 +674,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   // Derived: first UNUSED queued session
   const paidSession = sessions.find(s => !s.used) ?? null;
   const paidSessionId = paidSession?.id ?? null;
-  const paidSessionTier = (paidSession?.tier ?? "lite") as string;
+  const paidSessionTier = (paidSession?.tier ?? "") as string;
 
   function loadSessions() {
     try {
@@ -951,7 +951,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               disabled={isRunning || !code.trim()}
               className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
             >
-              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code <span className="opacity-70 font-normal">({paidSessionTier.toUpperCase()} tier)</span></>}
+              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code {paidSessionTier && <span className="opacity-70 font-normal">({paidSessionTier.toUpperCase()} tier)</span>}</>}
             </Button>
             {sessions.length > 1 && (
               <p className="text-center text-[10px] text-emerald-400/80 font-medium">
@@ -1116,44 +1116,16 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
               {/* Risk badge + summary */}
               <div className={`rounded-xl border p-4 space-y-2 ${risk.bg}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {risk.icon}
-                    <span className={`font-bold text-sm ${risk.color}`}>{risk.label}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Score pill */}
-                    {(() => {
-                      const scoreMap: Record<string, number> = { SAFE: 90, NEEDS_REVIEW: 62, RISKY: 32, CRITICAL: 10 };
-                      const score = scoreMap[result.risk_level] ?? 50;
-                      const color = score > 80 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
-                        : score > 55 ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
-                        : score > 25 ? "text-orange-400 bg-orange-500/10 border-orange-500/30"
-                        : "text-red-400 bg-red-500/10 border-red-500/30";
-                      return (
-                        <span data-testid="text-risk-score" className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded border ${color}`}>
-                          {score}% safe
-                        </span>
-                      );
-                    })()}
-                    {result.tier !== 'free' && (
-                      <button
-                        data-testid="button-download-pdf"
-                        onClick={() => void downloadReport(result, code)}
-                        className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground hover:text-white transition-colors px-2 py-1 rounded border border-white/10 hover:border-white/20 bg-white/5"
-                      >
-                        <Download className="w-3 h-3" />
-                        PDF
-                      </button>
-                    )}
-                  </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {risk.icon}
+                  <span className={`font-bold text-sm ${risk.color}`}>{risk.label}</span>
+                  {result.tier && (
+                    <span className="text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">
+                      {result.tier} tier
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-white/80 leading-relaxed">{result.summary}</p>
-                {result.tier && (
-                  <span className="inline-block text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">
-                    {result.tier} tier
-                  </span>
-                )}
               </div>
 
               {/* Full analysis detail lives in the panel below */}
