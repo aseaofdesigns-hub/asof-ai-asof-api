@@ -52,12 +52,14 @@ export default function VerifyPayment() {
             const qtyRes = await fetch(`/api/payment-quantity/${sessionId}`);
             qty = qtyRes.ok ? ((await qtyRes.json()).quantity ?? 1) : 1;
             const raw = localStorage.getItem("asof_sessions");
-            const sessions: Array<{ id: string; tier: string }> = raw ? JSON.parse(raw) : [];
+            const existing: Array<{ id: string; tier: string }> = raw ? JSON.parse(raw) : [];
+            const newSessions: Array<{ id: string; tier: string }> = [];
             for (let i = 0; i < qty; i++) {
-              sessions.push({ id: `${sessionId!}__${i}`, tier: data.tier ?? "lite" });
+              newSessions.push({ id: `${sessionId!}__${i}`, tier: data.tier ?? "lite" });
             }
-            localStorage.setItem("asof_sessions", JSON.stringify(sessions));
-            localStorage.setItem("stripe_session_id", sessions[0].id);
+            const allSessions = [...newSessions, ...existing];
+            localStorage.setItem("asof_sessions", JSON.stringify(allSessions));
+            localStorage.setItem("stripe_session_id", allSessions[0].id);
             if (data.tier) localStorage.setItem("purchased_tier", data.tier);
           } catch {}
           toast({
