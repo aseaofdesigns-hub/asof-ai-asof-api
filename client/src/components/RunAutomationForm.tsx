@@ -846,7 +846,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   ];
 
   const featureTable = [
-    { label: "Verdict (risk level)", lite: true, pro: true, max: true },
+    { label: "Summary", lite: true, pro: true, max: true },
     { label: "Assumptions", lite: true, pro: true, max: true },
     { label: "What Could Break", lite: true, pro: true, max: true },
     { label: "Verify Checklist", lite: false, pro: true, max: true },

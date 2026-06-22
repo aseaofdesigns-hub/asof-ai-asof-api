@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Lock, Zap, ShieldCheck, Loader2, Tag, PartyPopper, X } from "lucide-react";
 
 const FEATURE_ROWS = [
-  { label: "Risk Verdict", lite: true, pro: true, max: true },
+  { label: "Summary", lite: true, pro: true, max: true },
   { label: "What the AI Assumed", lite: true, pro: true, max: true },
   { label: "What Could Break", lite: true, pro: true, max: true },
   { label: "PDF Report Download", lite: true, pro: true, max: true },
