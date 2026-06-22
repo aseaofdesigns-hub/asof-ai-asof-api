@@ -375,18 +375,18 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string) 
     y += 14;
   }
 
+  const BADGE_W = 28; // fixed width so text always starts at same column
   function sevBadge(sev: string, bx: number, by: number): number {
     const col = SEV_RGB[sev] ?? [100,100,120];
     const label = sev;
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...col);
-    const tw = doc.getTextWidth(label) + 6;
     doc.setDrawColor(...col);
     doc.setLineWidth(0.3);
-    doc.roundedRect(bx, by - 5, tw, 6.5, 1, 1, "S");
-    doc.text(label, bx + 3, by);
-    return tw + 4;
+    doc.roundedRect(bx, by - 5, BADGE_W, 6.5, 1, 1, "S");
+    doc.text(label, bx + BADGE_W / 2, by, { align: "center" });
+    return BADGE_W + 4;
   }
 
   // ── HEADER ──────────────────────────────────────────────────────
