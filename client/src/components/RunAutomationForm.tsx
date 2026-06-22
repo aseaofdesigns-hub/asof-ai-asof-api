@@ -713,19 +713,26 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     });
   }
 
-  async function fetchUpgradedAnalysis(id: number) {
+  async function fetchUpgradedAnalysis(id: number, sessionId?: string) {
     const fp = getFingerprint();
     try {
-      const res = await fetch(`/api/analysis/${id}?fingerprint=${fp}`);
+      const params = new URLSearchParams({ fingerprint: fp });
+      if (sessionId) params.set("sessionId", sessionId);
+      const res = await fetch(`/api/analysis/${id}?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setResult(data);
         setAnalysisId(id);
         onResult?.(data, code);
         void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
-        toast({ title: "Analysis loaded", description: `Upgraded to ${data.tier?.toUpperCase() ?? 'new tier'}` });
+        toast({ title: "Upgrade applied!", description: `Now showing ${data.tier?.toUpperCase() ?? 'upgraded'} tier results.` });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Upgrade load failed", description: err.message ?? "Could not load upgraded analysis. Please refresh and try again.", variant: "destructive" });
       }
-    } catch {}
+    } catch {
+      toast({ title: "Upgrade load failed", description: "Network error — please refresh.", variant: "destructive" });
+    }
   }
 
   const loadExample = () => {
@@ -767,9 +774,9 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     const raw = localStorage.getItem("pending_upgrade");
     if (raw) {
       try {
-        const { analysisId: pendingId } = JSON.parse(raw);
+        const { analysisId: pendingId, sessionId: pendingSession } = JSON.parse(raw);
         localStorage.removeItem("pending_upgrade");
-        if (pendingId) fetchUpgradedAnalysis(pendingId);
+        if (pendingId) fetchUpgradedAnalysis(pendingId, pendingSession ?? undefined);
       } catch { localStorage.removeItem("pending_upgrade"); }
     }
 

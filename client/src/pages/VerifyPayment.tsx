@@ -40,6 +40,7 @@ export default function VerifyPayment() {
         localStorage.setItem("pending_upgrade", JSON.stringify({
           analysisId: data.analysisId,
           tier: data.tier,
+          sessionId,
         }));
         toast({
           title: "Analysis Upgraded!",

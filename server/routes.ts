@@ -1381,8 +1381,10 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
       if (!record) return res.status(404).json({ message: "Analysis not found" });
 
       // Ownership check — must match fingerprint or sessionId
+      // sessionId in DB may have __N suffix (e.g. cs_live_abc__0); strip it for comparison
       const ownsViaTierprint = fingerprint && record.fingerprint === fingerprint;
-      const ownsViaSession = sessionId && record.sessionId === sessionId;
+      const recordRawSession = record.sessionId ? record.sessionId.replace(/__\d+$/, '') : null;
+      const ownsViaSession = sessionId && (record.sessionId === sessionId || recordRawSession === sessionId);
       if (!ownsViaTierprint && !ownsViaSession) {
         return res.status(403).json({ message: "Not authorized to view this analysis" });
       }
