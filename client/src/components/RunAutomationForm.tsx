@@ -11,6 +11,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import type { CodeAnalysisResult } from "@shared/routes";
 import jsPDF from "jspdf";
+import { UpgradeBanner } from "./UpgradeBanner";
+import { TierIncludes } from "./TierIncludes";
+import { UpgradeBox } from "./UpgradeBox";
+import type { Tier } from "../lib/tierFeatures";
 
 const EXAMPLES: Array<{ code: string; prompt: string; result: CodeAnalysisResult }> = [
   {
@@ -643,6 +647,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const currentExampleRef = useRef<typeof EXAMPLES[number] | null>(null);
   const [ownerName, setOwnerName] = useState<string>("");
   const [upgradedFrom, setUpgradedFrom] = useState<string | null>(null);
+  const [activeTier, setActiveTier] = useState<Tier>("lite");
+  const [originalTier, setOriginalTier] = useState<Tier>("lite");
   const [usedProjectNames, setUsedProjectNames] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("asof_project_names") ?? "[]"); } catch { return []; }
   });
@@ -714,7 +720,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     });
   }
 
-  async function fetchUpgradedAnalysis(id: number, upgradeSessionId?: string) {
+  async function fetchUpgradedAnalysis(id: number, upgradeSessionId?: string, storedFromTier?: string) {
     const fp = getFingerprint();
     try {
       const params = new URLSearchParams({ fingerprint: fp });
@@ -722,12 +728,15 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       const res = await fetch(`/api/analysis/${id}?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        setUpgradedFrom(prev => result?.tier ?? prev ?? null);
+        const newTier = (data.tier ?? "lite") as Tier;
+        const prevTier = storedFromTier ?? activeTier;
+        setUpgradedFrom(prevTier);
+        setActiveTier(newTier);
         setResult(data);
         setAnalysisId(id);
         onResult?.(data, code);
         void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
-        toast({ title: "Upgrade applied!", description: `Now showing ${data.tier?.toUpperCase() ?? 'upgraded'} tier results.` });
+        toast({ title: "Upgrade applied!", description: `Now showing ${newTier.toUpperCase()} tier results.` });
       } else {
         const err = await res.json().catch(() => ({}));
         toast({ title: "Upgrade load failed", description: err.message ?? "Could not load upgraded analysis. Please refresh and try again.", variant: "destructive" });
@@ -777,8 +786,10 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     if (raw) {
       try {
         const { analysisId: pendingId, sessionId: pendingSession } = JSON.parse(raw);
+        const storedFromTier = localStorage.getItem("asof_upgrade_from_tier") ?? undefined;
         localStorage.removeItem("pending_upgrade");
-        if (pendingId) fetchUpgradedAnalysis(pendingId, pendingSession ?? undefined);
+        localStorage.removeItem("asof_upgrade_from_tier");
+        if (pendingId) fetchUpgradedAnalysis(pendingId, pendingSession ?? undefined, storedFromTier);
       } catch { localStorage.removeItem("pending_upgrade"); }
     }
 
@@ -814,6 +825,9 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       }
       localStorage.setItem("asof_pending_code", code);
       localStorage.setItem("asof_pending_prompt", userPrompt);
+      if (upgradeAnalysisId && fromTier) {
+        localStorage.setItem("asof_upgrade_from_tier", fromTier);
+      }
       if (window.self !== window.top) window.open(url, '_blank');
       else window.location.href = url;
     } catch (err) {
@@ -832,6 +846,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     setIsDemo(false);
     setShowSaferCode(false);
     setUpgradedFrom(null);
+    setActiveTier("lite");
     try {
       const body: any = { code, prompt: userPrompt || undefined, fingerprint: getFingerprint() };
       if (!asFree && paidSessionId) body.sessionId = paidSessionId;
@@ -850,6 +865,9 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       setResult(data);
       if (data.analysisId) setAnalysisId(data.analysisId);
       if (asFree) setFreeTrialAvailable(false);
+      const runTier = (data.tier ?? "lite") as Tier;
+      setActiveTier(runTier);
+      setOriginalTier(runTier);
       const savedProjectName = ownerName.trim() || undefined;
       if (paidSessionId && !asFree) {
         consumeSession(paidSessionId);
@@ -1236,52 +1254,14 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               )}
 
               {/* Upgrade confirmation banner */}
-              {upgradedFrom && result?.tier && upgradedFrom !== result.tier && (
-                <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-[10px]">
-                  <div className="flex items-center gap-2">
-                    <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span className="text-emerald-300 font-bold uppercase tracking-wider">
-                      Upgraded: {upgradedFrom.toUpperCase()} → {result.tier.toUpperCase()}
-                    </span>
-                    <span className="text-emerald-400/60 normal-case font-normal">— new features unlocked below</span>
-                  </div>
-                  <button onClick={() => setUpgradedFrom(null)} className="text-emerald-400/40 hover:text-emerald-300 transition-colors font-bold text-[11px]">✕</button>
-                </div>
+              {upgradedFrom && upgradedFrom !== activeTier && (
+                <UpgradeBanner fromTier={upgradedFrom} toTier={activeTier} />
               )}
 
               {/* Risk badge + summary */}
               <div className={`rounded-xl border p-4 space-y-3 ${risk.bg}`}>
-                {/* Row 1: header */}
                 <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">Your Tier Includes:</p>
-
-                {/* Section definitions */}
-                {(() => {
-                  const tier = result.tier ?? "free";
-                  const hasPro = tier === "pro" || tier === "max";
-                  const hasMax = tier === "max";
-                  const sections = [
-                    { label: "Summary", desc: "Overall risk verdict and why.", color: "text-sky-300 bg-sky-500/10 border-sky-500/30", included: true },
-                    { label: "Assumptions", desc: `${(result.assumptions?.length ?? 0)} things the AI took for granted.`, color: "text-amber-300 bg-amber-500/10 border-amber-500/30", included: true },
-                    { label: "What Could Break", desc: `${(result.risks?.length ?? 0)} real failure scenarios.`, color: "text-red-300 bg-red-500/10 border-red-500/30", included: true },
-                    { label: "Verify Checklist", desc: "Steps to confirm before you ship.", color: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30", included: hasPro },
-                    { label: "Suggestions", desc: "Fix cards for each issue found.", color: "text-blue-300 bg-blue-500/10 border-blue-500/30", included: hasPro },
-                    { label: "Safe Rewrite", desc: "A safer drop-in version of your code.", color: "text-purple-300 bg-purple-500/10 border-purple-500/30", included: hasMax },
-                  ];
-                  return (
-                    <div className="space-y-1.5">
-                      {sections.map((s) => (
-                        <div key={s.label} className="flex items-start gap-2">
-                          <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${s.included ? s.color : "text-white/20 bg-white/5 border-white/10"}`}>
-                            {s.label}
-                          </span>
-                          <span className={`text-[10px] leading-snug mt-0.5 ${s.included ? "text-white/60" : "text-white/25"}`}>
-                            {s.included ? s.desc : "Locked — upgrade to unlock"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                <TierIncludes activeTier={activeTier} />
               </div>
 
               {/* Full analysis detail lives in the panel below */}
@@ -1292,56 +1272,34 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                 </p>
               )}
 
-              {/* Gated upgrade prompt — diff pricing with analysisId */}
-              {result.gated && result.gated_tier && (
+              {/* Upgrade prompt — UpgradeBox when we have an analysisId, fallback fresh purchase otherwise */}
+              {result.gated && analysisId && activeTier !== "max" && (
+                <UpgradeBox
+                  currentTier={activeTier}
+                  originalTier={originalTier}
+                  onUpgrade={(toTier) => initiatePayment(toTier, analysisId, activeTier)}
+                />
+              )}
+              {result.gated && !analysisId && result.gated_tier && (
                 <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-3">
-                  <div className="flex items-center gap-2">
+                  <p className="text-xs font-bold text-purple-300 flex items-center gap-2">
                     <Lock className="w-4 h-4 text-purple-400" />
-                    <p className="text-xs font-bold text-purple-300">
-                      {analysisId ? "Upgrade this analysis — pay only the difference" : `Unlock ${result.gated_tier.toUpperCase()} tier`}
-                    </p>
+                    Unlock {result.gated_tier.toUpperCase()} tier
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {tiers.filter(t => {
+                      const order = { lite: 0, pro: 1, max: 2 };
+                      return order[t.id] >= order[result.gated_tier as keyof typeof order];
+                    }).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => initiatePayment(t.id)}
+                        className="text-[10px] font-bold px-3 py-1.5 rounded border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all"
+                      >
+                        {t.name} — {t.price}
+                      </button>
+                    ))}
                   </div>
-
-                  {/* Upgrade-in-place (diff pricing) — only when we have an analysisId */}
-                  {analysisId && (
-                    <div className="space-y-2">
-                      {getUpgradeOptions(result.tier ?? 'free', result.gated_tier).map(opt => (
-                        <button
-                          key={opt.tier}
-                          data-testid={`button-upgrade-${opt.tier}`}
-                          onClick={() => initiatePayment(opt.tier, analysisId, result.tier ?? 'free')}
-                          className="flex items-center justify-between w-full text-[10px] font-bold px-3 py-2.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 transition-all"
-                        >
-                          <div className="flex items-center gap-2">
-                            <ArrowUpCircle className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                            <div className="text-left">
-                              <p className="font-bold">{opt.name} — {opt.description}</p>
-                            </div>
-                          </div>
-                          <span className="font-mono text-purple-300 shrink-0 ml-3">{opt.diffLabel}</span>
-                        </button>
-                      ))}
-                      <p className="text-[9px] text-purple-400/50 pl-1">Same analysis, instantly expanded — no re-run needed.</p>
-                    </div>
-                  )}
-
-                  {/* Fallback: fresh purchase (no analysisId or free) */}
-                  {!analysisId && (
-                    <div className="flex gap-2 flex-wrap">
-                      {tiers.filter(t => {
-                        const order = { lite: 0, pro: 1, max: 2 };
-                        return order[t.id] >= order[result.gated_tier as keyof typeof order];
-                      }).map(t => (
-                        <button
-                          key={t.id}
-                          onClick={() => initiatePayment(t.id)}
-                          className="text-[10px] font-bold px-3 py-1.5 rounded border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all"
-                        >
-                          {t.name} — {t.price}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
             </motion.div>
