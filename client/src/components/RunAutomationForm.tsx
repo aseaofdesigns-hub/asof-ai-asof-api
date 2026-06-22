@@ -613,7 +613,18 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<CodeAnalysisResult | null>(null);
   const [isDemo, setIsDemo] = useState(false);
-  const [sessions, setSessions] = useState<Array<{ id: string; tier: string; used?: boolean }>>([]);
+  const [sessions, setSessions] = useState<Array<{ id: string; tier: string; used?: boolean }>>(() => {
+    try {
+      const raw = localStorage.getItem("asof_sessions");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      const old = localStorage.getItem("stripe_session_id");
+      if (old) return [{ id: old, tier: localStorage.getItem("purchased_tier") ?? "lite" }];
+    } catch {}
+    return [];
+  });
   const [analysisId, setAnalysisId] = useState<number | null>(null);
   const [freeTrialAvailable, setFreeTrialAvailable] = useState<boolean | null>(null);
   const [showSaferCode, setShowSaferCode] = useState(false);
