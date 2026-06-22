@@ -169,7 +169,7 @@ export default function About() {
                 {[
                   {
                     name: "Lite", price: "$0.50", color: "text-emerald-400", border: "border-emerald-500/20 bg-emerald-500/5",
-                    features: ["Risk verdict", "Full assumption list", "What could break"],
+                    features: ["Risk verdict", "Full assumption list", "What could break", "PDF report download"],
                   },
                   {
                     name: "Pro", price: "$1.00", color: "text-blue-400", border: "border-blue-500/20 bg-blue-500/5",
@@ -196,7 +196,7 @@ export default function About() {
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-muted-foreground text-center">One free Lite-tier trial per device — no payment required to start.</p>
+              <p className="text-[10px] text-muted-foreground text-center">One free trial per device (verdict + 2 assumptions) — no payment required to start.</p>
             </div>
           </motion.div>
 

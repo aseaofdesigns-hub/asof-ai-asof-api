@@ -48,7 +48,7 @@ export default function FAQ() {
     },
     {
       question: "Can I try ASOF.ai before paying?",
-      answer: "Yes. You get one free Lite-tier validation per device — no payment required. After that, each run requires a paid session.",
+      answer: "Yes. You get one free trial per device — no payment required. The free trial gives you the risk verdict and up to 2 hidden assumptions. Upgrade to Lite ($0.50) for the full assumption list, every risk flag, and a PDF report.",
       icon: <Check className="w-4 h-4 text-emerald-400" />
     },
     {
@@ -58,7 +58,7 @@ export default function FAQ() {
     },
     {
       question: "What does each tier include?",
-      answer: "Every tier gives you a risk verdict and the full assumption list. Lite ($0.50) adds what could break. Pro ($1.00) adds the verify checklist and suggestion cards. Max ($2.50) adds a safer code rewrite side-by-side with your original.",
+      answer: "Free trial: risk verdict and 2 assumptions (no PDF). Lite ($0.50): full assumption list, every risk flag, and PDF download. Pro ($1.00): adds a verify checklist and suggestion cards. Max ($2.50): adds a safer code rewrite side-by-side with your original.",
       icon: <Check className="w-4 h-4 text-emerald-400" />
     },
   ];

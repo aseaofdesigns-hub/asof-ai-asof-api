@@ -1123,14 +1123,16 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                         </span>
                       );
                     })()}
-                    <button
-                      data-testid="button-download-pdf"
-                      onClick={() => void downloadReport(result, code)}
-                      className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground hover:text-white transition-colors px-2 py-1 rounded border border-white/10 hover:border-white/20 bg-white/5"
-                    >
-                      <Download className="w-3 h-3" />
-                      PDF
-                    </button>
+                    {result.tier !== 'free' && (
+                      <button
+                        data-testid="button-download-pdf"
+                        onClick={() => void downloadReport(result, code)}
+                        className="flex items-center gap-1 text-[9px] font-semibold text-muted-foreground hover:text-white transition-colors px-2 py-1 rounded border border-white/10 hover:border-white/20 bg-white/5"
+                      >
+                        <Download className="w-3 h-3" />
+                        PDF
+                      </button>
+                    )}
                   </div>
                 </div>
                 <p className="text-xs text-white/80 leading-relaxed">{result.summary}</p>

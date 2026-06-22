@@ -10,6 +10,7 @@ const FEATURE_ROWS = [
   { label: "Risk Verdict", lite: true, pro: true, max: true },
   { label: "What the AI Assumed", lite: true, pro: true, max: true },
   { label: "What Could Break", lite: true, pro: true, max: true },
+  { label: "PDF Report Download", lite: true, pro: true, max: true },
   { label: "Verify Checklist", lite: false, pro: true, max: true },
   { label: "Suggestion Cards", lite: false, pro: true, max: true },
   { label: "Safer Code Rewrite", lite: false, pro: false, max: true },
