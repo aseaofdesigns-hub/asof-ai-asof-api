@@ -1,6 +1,6 @@
 import { useCodeAnalyses } from "@/hooks/use-automation";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 
 function riskToScore(riskLevel: string): number {
   switch (riskLevel) {
@@ -25,7 +25,7 @@ export function ConfidenceChart() {
   const chartData = analyses && analyses.length >= 2
     ? [...analyses]
         .sort((a, b) => new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime())
-        .slice(-20)
+        .slice(-30)
         .map(a => ({
           time: new Date(a.timestamp!).getTime(),
           score: riskToScore(a.riskLevel),
@@ -33,6 +33,9 @@ export function ConfidenceChart() {
           summary: a.summary,
         }))
     : [];
+
+  const spansMultipleDays = chartData.length >= 2 &&
+    !isSameDay(new Date(chartData[0].time), new Date(chartData[chartData.length - 1].time));
 
   if (chartData.length < 2) {
     return (
@@ -55,7 +58,11 @@ export function ConfidenceChart() {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
           <XAxis
             dataKey="time"
-            tickFormatter={(time) => format(time, "HH:mm")}
+            tickFormatter={(time) =>
+              spansMultipleDays
+                ? format(time, "MMM d")
+                : format(time, "HH:mm")
+            }
             stroke="rgba(255,255,255,0.2)"
             tick={{ fontSize: 10, fill: "rgba(255,255,255,0.4)" }}
             tickLine={false}
@@ -69,7 +76,7 @@ export function ConfidenceChart() {
                 return (
                   <div className="bg-secondary border border-white/10 p-3 rounded-lg shadow-xl backdrop-blur-md">
                     <p className="text-xs text-muted-foreground mb-1">
-                      {format(label, "MMM dd, HH:mm:ss")}
+                      {format(label, "MMM dd yyyy, HH:mm")}
                     </p>
                     <p className="font-bold" style={{ color: riskColor(score) }}>
                       {(payload[0].payload as any).riskLevel} — {score}%
