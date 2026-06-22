@@ -1,6 +1,24 @@
-import { useCodeAnalyses } from "@/hooks/use-automation";
+import { useCodeAnalyses, useSignals } from "@/hooks/use-automation";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { format, isSameDay } from "date-fns";
+
+function insightToScore(insight: string): number {
+  const u = insight.toUpperCase();
+  if (u.includes("VALID") && !u.includes("INVALID")) return 95;
+  if (u.includes("CONFLICTED") || u.includes("STALE")) return 35;
+  if (u.includes("INVALID")) return 10;
+  if (u.includes("UNKNOWN")) return 65;
+  return 50;
+}
+
+function insightToRisk(insight: string): string {
+  const u = insight.toUpperCase();
+  if (u.includes("VALID") && !u.includes("INVALID")) return "SAFE";
+  if (u.includes("CONFLICTED") || u.includes("STALE")) return "RISKY";
+  if (u.includes("INVALID")) return "CRITICAL";
+  if (u.includes("UNKNOWN")) return "NEEDS_REVIEW";
+  return "NEEDS_REVIEW";
+}
 
 function riskToScore(riskLevel: string): number {
   switch (riskLevel) {
@@ -21,18 +39,25 @@ function riskColor(score: number): string {
 
 export function ConfidenceChart() {
   const { data: analyses } = useCodeAnalyses();
+  const { data: signals } = useSignals();
 
-  const chartData = analyses && analyses.length >= 2
-    ? [...analyses]
-        .sort((a, b) => new Date(a.timestamp!).getTime() - new Date(b.timestamp!).getTime())
-        .slice(-30)
-        .map(a => ({
-          time: new Date(a.timestamp!).getTime(),
-          score: riskToScore(a.riskLevel),
-          riskLevel: a.riskLevel,
-          summary: a.summary,
-        }))
-    : [];
+  const fromAnalyses = (analyses ?? []).map(a => ({
+    time: new Date(a.timestamp!).getTime(),
+    score: riskToScore(a.riskLevel),
+    riskLevel: a.riskLevel,
+    summary: a.summary ?? "",
+  }));
+
+  const fromSignals = (signals ?? []).map(s => ({
+    time: new Date(s.timestamp!).getTime(),
+    score: insightToScore(s.insight),
+    riskLevel: insightToRisk(s.insight),
+    summary: s.insight,
+  }));
+
+  const chartData = [...fromAnalyses, ...fromSignals]
+    .sort((a, b) => a.time - b.time)
+    .slice(-40);
 
   const spansMultipleDays = chartData.length >= 2 &&
     !isSameDay(new Date(chartData[0].time), new Date(chartData[chartData.length - 1].time));

@@ -1,3 +1,5 @@
 - [OpenAI integration](openai-integration.md) — uses Replit AI Integrations (no API key needed); env vars AI_INTEGRATIONS_OPENAI_API_KEY and AI_INTEGRATIONS_OPENAI_BASE_URL
 - [Code analysis endpoint](code-analysis-endpoint.md) — /api/analyze-code uses gpt-5.4 with JSON response_format; tier gating returns subsets of analysis
-- [SignalsTable history](signals-table-history.md) — Recent Analyses only shows code_analyses; legacy signals fallback removed; sessions marked used not deleted
+- [path-to-regexp deploy crash](path-to-regexp-deploy.md) — Express 4 needs path-to-regexp 0.1.x; root-level v8 in deps causes "n$ is not a function" crash in production bundle
+- [Confidence chart data sources](confidence-chart-sources.md) — chart merges both signals table (Jan-Apr legacy) and code_analyses table (Jun+); useSignals + useCodeAnalyses combined
+- [Global analyses view](global-analyses.md) — Recent Analyses and stats show ALL analyses globally via getAllCodeAnalyses(); no per-browser fingerprint filter
