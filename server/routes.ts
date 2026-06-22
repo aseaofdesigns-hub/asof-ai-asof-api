@@ -1147,9 +1147,21 @@ export async function registerRoutes(
   });
 
   // ── Code analysis history ─────────────────────────────────────────────────
+  // Scoped to the caller's own fingerprints + session IDs — never returns other users' data
   app.get('/api/code-analyses', async (req, res) => {
     try {
-      const analyses = await storage.getAllCodeAnalyses();
+      const fpRaw = req.query.fingerprint;
+      const sidRaw = req.query.sessionId;
+      const fingerprints = (Array.isArray(fpRaw) ? fpRaw : fpRaw ? [fpRaw] : []).filter(
+        (v): v is string => typeof v === 'string' && v.length > 0
+      );
+      const sessionIds = (Array.isArray(sidRaw) ? sidRaw : sidRaw ? [sidRaw] : []).filter(
+        (v): v is string => typeof v === 'string' && v.length > 0
+      );
+      if (fingerprints.length === 0 && sessionIds.length === 0) {
+        return res.json([]);
+      }
+      const analyses = await storage.getCodeAnalyses({ fingerprints, sessionIds });
       const safe = analyses.map(({ codeSnippet: _omit, ...rest }) => rest);
       return res.json(safe);
     } catch (err) {
