@@ -1,4 +1,4 @@
-import { getNextUpgrade, UPGRADE_PRICES, type Tier } from "../lib/tierFeatures";
+import { getAvailableUpgrades, UPGRADE_PRICES, type Tier } from "../lib/tierFeatures";
 
 interface UpgradeBoxProps {
   currentTier: Tier;
@@ -13,33 +13,37 @@ const TIER_LABELS: Record<Tier, string> = {
 };
 
 export function UpgradeBox({ currentTier, originalTier, onUpgrade }: UpgradeBoxProps) {
-  const nextTier = getNextUpgrade(currentTier);
-  if (!nextTier) return null;
-
-  const price =
-    UPGRADE_PRICES[`${originalTier}->${nextTier}`] ??
-    UPGRADE_PRICES[`${currentTier}->${nextTier}`] ??
-    0;
+  const available = getAvailableUpgrades(currentTier);
+  if (available.length === 0) return null;
 
   return (
-    <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-3">
-      <p className="text-xs font-bold text-purple-300 flex items-center gap-2">
+    <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-2">
+      <p className="text-xs font-bold text-purple-300 pb-1">
         ⬆ Upgrade this analysis — pay only the difference
       </p>
-      <button
-        data-testid={`button-upgrade-${nextTier}`}
-        onClick={() => onUpgrade(nextTier)}
-        className="w-full flex items-center justify-between rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-3 text-sm text-white hover:bg-purple-500/20 transition-colors"
-      >
-        <span className="flex items-center gap-2 text-[11px] font-bold text-left">
-          <span className="text-purple-400">⊕</span>
-          {TIER_LABELS[nextTier]}
-        </span>
-        <span className="text-purple-300 font-mono font-bold shrink-0 ml-3">
-          +${price.toFixed(2)}
-        </span>
-      </button>
-      <p className="text-[9px] text-purple-400/50 text-center">
+      {available.map((toTier) => {
+        const price =
+          UPGRADE_PRICES[`${originalTier}->${toTier}`] ??
+          UPGRADE_PRICES[`${currentTier}->${toTier}`] ??
+          0;
+        return (
+          <button
+            key={toTier}
+            data-testid={`button-upgrade-${toTier}`}
+            onClick={() => onUpgrade(toTier)}
+            className="w-full flex items-center justify-between rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-3 text-sm text-white hover:bg-purple-500/20 transition-colors"
+          >
+            <span className="flex items-center gap-2 text-[11px] font-bold text-left">
+              <span className="text-purple-400">⊕</span>
+              {TIER_LABELS[toTier]}
+            </span>
+            <span className="text-purple-300 font-mono font-bold shrink-0 ml-3">
+              +${price.toFixed(2)}
+            </span>
+          </button>
+        );
+      })}
+      <p className="text-[9px] text-purple-400/50 text-center pt-1">
         Same analysis, instantly expanded — no re-run needed.
       </p>
     </div>
