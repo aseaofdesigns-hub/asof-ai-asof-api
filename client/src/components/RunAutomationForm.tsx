@@ -961,7 +961,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             data-testid="input-code"
             value={code}
             onChange={e => { setCode(e.target.value); if (isExampleLoaded) setIsExampleLoaded(false); }}
-            placeholder="Paste AI-generated code here..."
+            placeholder="Paste any AI-generated code — auth flows, API routes, database queries, payment logic. ASOF finds what the AI silently assumed and what could break before you ship it."
             className="glass-input font-mono text-xs min-h-[160px] resize-y leading-relaxed"
             spellCheck={false}
           />
@@ -970,8 +970,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
           </p>
         </div>
 
-        {/* Optional prompt — hidden until code is present */}
-        {(isExampleLoaded || code.length > 0) && (
+        {/* Optional prompt */}
         <div className="space-y-2">
           <Label htmlFor="prompt-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             What did you ask the AI to build? <span className="normal-case font-normal text-muted-foreground/60">(optional but improves accuracy)</span>
@@ -986,7 +985,6 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             spellCheck={false}
           />
         </div>
-        )}
 
         {/* CTA area */}
         {freeTrialAvailable && !paidSessionId && (
