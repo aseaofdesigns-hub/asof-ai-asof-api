@@ -45,7 +45,7 @@ export const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests. Please try again later." },
-  skip: (req) => req.path === "/api/stripe/webhook",
+  skip: (req) => req.originalUrl === "/api/stripe/webhook" || req.path === "/stripe/webhook",
 });
 
 export const analyzeLimiter = rateLimit({
