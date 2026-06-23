@@ -1,0 +1,91 @@
+The code explicitly follows the prompt's assumption that `fetch` succeeds, but it also silently assumes the HTTP
+status is OK, the response body is valid JSON, and `user.name` is always a string. Those assumptions can cause
+runtime failures or incorrect behavior in common real-world cases.
+Fix These First
+1
+If the server returns 404, 500, or another non-2xx status, `response.json()` may still run
+and produce misleading errors or unexpected data instead of failing clearly.
+2
+If the response body is empty, HTML, or malformed JSON, `await response.json()` will throw and reject the
+function.
+3
+If the API returns `{}` or `{ name: null }`, `user.name.toUpperCase()` throws `TypeError: Cannot read properties of
+undefined/null`.
+What the AI Assumed
+HIGH The AI assumed `response.ok` is true and that non-2xx HTTP responses do not
+need handling.
+HIGH The AI assumed `response.json()` always succeeds because the body is valid JSON.
+HIGH The AI assumed the parsed JSON is an object with a `name` property.
+HIGH The AI assumed `user.name` is a string, so calling `toUpperCase()` is always valid.
+MEDIUM The AI assumed `id` is safe to interpolate directly into `/api/users/${id}` without encoding or validation.
+MEDIUM The AI assumed `fetch(`/api/users/${id}`)` resolves successfully and returns a usable `Response` object.
+What Could Break
+HIGH If the server returns 404, 500, or another non-2xx status, `response.json()` may still
+run and produce misleading errors or unexpected data instead of failing clearly.
+ASOF.ai — asofai.com | Support@asofai.com Page 1
+ASOF.ai — AI Code Analysis Report (continued)
+HIGH If the response body is empty, HTML, or malformed JSON, `await response.json()` will throw and reject the
+function.
+HIGH If the API returns `{}` or `{ name: null }`, `user.name.toUpperCase()` throws `TypeError: Cannot read
+properties of undefined/null`.
+HIGH If the API returns a non-string `name` such as a number or object, `toUpperCase()` is not available and the
+function crashes.
+MEDIUM If `id` contains `/`, `?`, `#`, or other special characters, the request URL may target the wrong endpoint or
+break routing.
+Verify Checklist
+[ ] Verify what types and formats `id` can contain, and whether it must be URL-encoded
+with `encodeURIComponent(id)`.
+[ ] Verify the API contract for `GET /api/users/:id`, especially whether error responses are JSON and what shape
+successful responses have.
+[ ] Verify that successful responses always include a string `name` field.
+[ ] Verify how callers expect failures to be reported: thrown errors, `null`, fallback strings, or a result object.
+[ ] Verify whether non-2xx responses should be retried, logged, or mapped to domain-specific errors.
+[ ] Verify whether this function runs in an environment where `fetch` is available.
+Suggestion Cards
+Unvalidated `id` in URL path
+Why it matters:
+Directly interpolating `id` into the URL can break the route or change the request target
+when `id` contains reserved URL characters.
+Fix:
+Convert `id` to a string, require it to be non-empty, and use
+`encodeURIComponent(String(id))` when building the URL.
+No HTTP status check
+Why it matters:
+A resolved `fetch` does not mean the request succeeded; 404 and 500 responses still resolve and may cause confusing downstream errors.
+Fix:
+Check `response.ok` before parsing the body and throw a clear error including `response.status`.
+ASOF.ai — asofai.com | Support@asofai.com Page 2
+ASOF.ai — AI Code Analysis Report (continued)
+Blind JSON parsing
+Why it matters:
+If the server returns malformed JSON or a non-JSON error page, `response.json()` throws without context.
+Fix:
+Wrap `response.json()` in `try/catch` and rethrow a descriptive parsing error.
+No response shape validation
+Why it matters:
+The function assumes the parsed object has a string `name`, but APIs often evolve or return partial data on error paths.
+Fix:
+Validate that `user` is an object and `user.name` is a string before calling `toUpperCase()`.
+Suggested Safe Rewrite
+async function getUser(id) {
+ if (id === undefined || id === null || id === '') {
+ throw new TypeError('getUser: "id" must be a non-empty value');
+ }
+ const url = `/api/users/${encodeURIComponent(String(id))}`;
+ const response = await fetch(url);
+ if (!response.ok) {
+ throw new Error(`getUser: request failed with status ${response.status}`);
+ }
+ let user;
+ try {
+ user = await response.json();
+ } catch (error) {
+ throw new Error('getUser: response body is not valid JSON');
+ }
+ if (!user || typeof user !== 'object') {
+ throw new TypeError('getUser: response JSON must be an object');
+ }
+ if (typeof user.name !== 'string') {
+ throw new TypeError('getUser: response JSON must include a string "name" property');
+ }
+ return user.name.toUpperCase();
