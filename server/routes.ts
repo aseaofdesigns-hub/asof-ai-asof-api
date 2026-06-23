@@ -1416,6 +1416,7 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
         assumptions: fullData.assumptions ?? [],
         tier,
         analysisId: record.id,
+        projectName: record.projectName ?? undefined,
       };
 
       if (tier === 'free') {

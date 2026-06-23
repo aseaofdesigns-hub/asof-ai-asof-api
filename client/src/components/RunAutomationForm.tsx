@@ -746,7 +746,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         setActiveTier(newTier);
         setResult(data);
         setAnalysisId(id);
-        onResult?.(data, code, undefined, prevTier);
+        onResult?.(data, code, data.projectName ?? undefined, prevTier);
         void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
         // Only clear pending_upgrade after confirmed success
         localStorage.removeItem("pending_upgrade");
