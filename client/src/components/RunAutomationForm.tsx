@@ -649,6 +649,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const [upgradedFrom, setUpgradedFrom] = useState<string | null>(null);
   const [activeTier, setActiveTier] = useState<Tier>("lite");
   const [originalTier, setOriginalTier] = useState<Tier>("lite");
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [analysisSlowMsg, setAnalysisSlowMsg] = useState(false);
   const [usedProjectNames, setUsedProjectNames] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("asof_project_names") ?? "[]"); } catch { return []; }
   });
@@ -720,8 +722,9 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     });
   }
 
-  async function fetchUpgradedAnalysis(id: number, upgradeSessionId?: string, storedFromTier?: string) {
+  async function fetchUpgradedAnalysis(id: number, upgradeSessionId?: string, storedFromTier?: string, rawPending?: string) {
     const fp = getFingerprint();
+    setIsUpgrading(true);
     try {
       const params = new URLSearchParams({ fingerprint: fp });
       if (upgradeSessionId) params.set("upgradeSessionId", upgradeSessionId);
@@ -736,13 +739,22 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         setAnalysisId(id);
         onResult?.(data, code, undefined, prevTier);
         void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
+        // Only clear pending_upgrade after confirmed success
+        localStorage.removeItem("pending_upgrade");
+        localStorage.removeItem("asof_upgrade_from_tier");
         toast({ title: "Upgrade applied!", description: `Now showing ${newTier.toUpperCase()} tier results.` });
       } else {
         const err = await res.json().catch(() => ({}));
-        toast({ title: "Upgrade load failed", description: err.message ?? "Could not load upgraded analysis. Please refresh and try again.", variant: "destructive" });
+        // Restore pending_upgrade so the user can retry on next load
+        if (rawPending) localStorage.setItem("pending_upgrade", rawPending);
+        toast({ title: "Upgrade load failed", description: err.message ?? "Could not load upgraded analysis. Please try again.", variant: "destructive" });
       }
     } catch {
-      toast({ title: "Upgrade load failed", description: "Network error — please refresh.", variant: "destructive" });
+      // Restore pending_upgrade so the user can retry on next load
+      if (rawPending) localStorage.setItem("pending_upgrade", rawPending);
+      toast({ title: "Upgrade load failed", description: "Network error — please refresh and try again.", variant: "destructive" });
+    } finally {
+      setIsUpgrading(false);
     }
   }
 
@@ -787,9 +799,11 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       try {
         const { analysisId: pendingId, sessionId: pendingSession } = JSON.parse(raw);
         const storedFromTier = localStorage.getItem("asof_upgrade_from_tier") ?? undefined;
+        // Remove immediately to prevent double-execution on re-mounts.
+        // fetchUpgradedAnalysis restores it on failure so the user can retry by refreshing.
         localStorage.removeItem("pending_upgrade");
         localStorage.removeItem("asof_upgrade_from_tier");
-        if (pendingId) fetchUpgradedAnalysis(pendingId, pendingSession ?? undefined, storedFromTier);
+        if (pendingId) fetchUpgradedAnalysis(pendingId, pendingSession ?? undefined, storedFromTier, raw);
       } catch { localStorage.removeItem("pending_upgrade"); }
     }
 
@@ -842,12 +856,14 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       return;
     }
     setIsRunning(true);
+    setAnalysisSlowMsg(false);
     setResult(null);
     setAnalysisId(null);
     setIsDemo(false);
     setShowSaferCode(false);
     setUpgradedFrom(null);
     setActiveTier("lite");
+    const slowTimer = setTimeout(() => setAnalysisSlowMsg(true), 15000);
     try {
       const body: any = { code, prompt: userPrompt || undefined, fingerprint: getFingerprint() };
       if (!asFree && paidSessionId) body.sessionId = paidSessionId;
@@ -886,6 +902,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     } catch (err) {
       toast({ title: "Analysis failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
     } finally {
+      clearTimeout(slowTimer);
+      setAnalysisSlowMsg(false);
       setIsRunning(false);
     }
   };
@@ -910,6 +928,14 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   return (
     <Card className="glass-card border-white/5 overflow-hidden flex flex-col relative">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500" />
+
+      {isUpgrading && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm rounded-xl">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          <p className="text-sm font-semibold text-white">Loading your upgraded analysis…</p>
+          <p className="text-xs text-white/50">Just a moment</p>
+        </div>
+      )}
 
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center justify-between text-lg">
@@ -1053,8 +1079,13 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               disabled={isRunning || !code.trim() || !ownerName.trim() || !!usedProjectNames.includes(ownerName.trim().toLowerCase())}
               className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
             >
-              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing with AI...</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
+              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{analysisSlowMsg ? "Still working..." : "Analyzing with AI..."}</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
             </Button>
+            {isRunning && analysisSlowMsg && (
+              <p className="text-center text-[11px] text-amber-400/80 font-medium animate-pulse">
+                AI is generating your report — usually 30–60 s, please wait…
+              </p>
+            )}
             {sessions.length > 1 && (
               <p className="text-center text-[10px] text-emerald-400/80 font-medium">
                 {sessions.length} credits queued — used one at a time
