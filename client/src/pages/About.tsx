@@ -65,7 +65,7 @@ export default function About() {
           {/* Hero */}
           <div className="text-center space-y-5">
             <motion.div variants={item} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary uppercase tracking-widest">
-              A second opinion before you trust AI code
+              The second opinion your code deserves
             </motion.div>
             <motion.h1 variants={item} className="text-4xl md:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/50">
                       ASOF finds the hidden assumptions in your code before they break in production.
