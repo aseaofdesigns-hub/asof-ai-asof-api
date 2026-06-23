@@ -25,8 +25,8 @@ export default function About() {
       icon: <Code2 className="w-5 h-5 text-primary" />,
       bg: "bg-primary/20",
       label: "Developers",
-      tagline: "Assumption validation for AI-generated code",
-      desc: "Catch the silent guesses your AI coding agent makes before they hit production."
+      tagline: "Assumption validation for any code",
+      desc: "Catch silent guesses — whether from an AI coding agent or your own hands — before they hit production."
     },
     {
       icon: <Users className="w-5 h-5 text-emerald-400" />,
@@ -40,7 +40,7 @@ export default function About() {
       bg: "bg-purple-500/20",
       label: "Teams",
       tagline: "Pre-merge review layer for AI coding agents",
-      desc: "Add a validation step before any AI-generated code ships — no extra tooling required."
+      desc: "Add a validation step before any code ships — AI-written or human-written — no extra tooling required."
     },
   ];
 
@@ -68,10 +68,10 @@ export default function About() {
               A second opinion before you trust AI code
             </motion.div>
             <motion.h1 variants={item} className="text-4xl md:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/50">
-              ASOF finds the hidden assumptions in AI-generated code before you trust it.
+                      ASOF finds the hidden assumptions in your code before they break in production.
             </motion.h1>
             <motion.p variants={item} className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              The scary part of AI-generated code isn't the syntax bugs. It's that the AI guessed something, sounded confident, and you shipped it. ASOF catches those guesses before they become your problem.
+              Whether you wrote it yourself or an AI did — code makes silent assumptions about inputs, APIs, and databases. ASOF surfaces every one of them before you ship.
             </motion.p>
           </div>
 

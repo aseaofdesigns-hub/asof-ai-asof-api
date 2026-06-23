@@ -1002,12 +1002,12 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             data-testid="input-code"
             value={code}
             onChange={e => { setCode(e.target.value); if (isExampleLoaded) setIsExampleLoaded(false); }}
-            placeholder="Paste any AI-generated code — auth flows, API routes, database queries, payment logic. ASOF finds what the AI silently assumed and what could break before you ship it."
+            placeholder="Paste any code — AI-generated or handwritten — auth flows, API routes, database queries, payment logic. ASOF finds the hidden assumptions and what could break before you ship it."
             className="glass-input font-mono text-xs min-h-[160px] resize-y leading-relaxed"
             spellCheck={false}
           />
           <p className="text-[10px] text-white/30 leading-relaxed">
-            Works with any AI-generated code — login systems, API routes, payment flows, database queries, webhooks, and more. ASOF reads what the AI silently assumed and tells you exactly what could break before you ship it.
+            Works with any code — AI-generated or handwritten. Login systems, API routes, payment flows, database queries, webhooks, and more. ASOF finds the hidden assumptions and tells you exactly what could break before you ship it.
           </p>
         </div>
 

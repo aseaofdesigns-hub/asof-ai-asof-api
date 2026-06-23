@@ -151,7 +151,7 @@ export default function Pricing() {
             Simple, honest pricing
           </h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto leading-relaxed">
-            Each tier gives you a deeper look at what your AI-generated code assumed and where it could fail.
+            Each tier gives you a deeper look at what your code assumed and where it could fail — AI-written or your own.
             Pay once per analysis — no monthly fees.
           </p>
         </motion.div>
