@@ -732,6 +732,15 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       if (res.ok) {
         const data = await res.json();
         const newTier = (data.tier ?? "lite") as Tier;
+        // Validate the returned tier matches what we paid for.
+        // If the analysis wasn't upgraded yet (DB lag, wrong ID, etc.) don't accept wrong tier.
+        const expectedTier = rawPending ? (() => { try { return JSON.parse(rawPending).tier as string | undefined; } catch { return undefined; } })() : undefined;
+        if (expectedTier && newTier !== expectedTier) {
+          if (rawPending) localStorage.setItem("pending_upgrade", rawPending);
+          console.error("[upgrade] tier mismatch: expected", expectedTier, "got", newTier, "for analysis", id);
+          toast({ title: "Upgrade not applied yet", description: `Expected ${expectedTier.toUpperCase()} but got ${newTier.toUpperCase()}. Please refresh to retry.`, variant: "destructive" });
+          return;
+        }
         const prevTier = storedFromTier ?? activeTier;
         setUpgradedFrom(prevTier);
         setActiveTier(newTier);
@@ -863,7 +872,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     localStorage.removeItem("asof_upgrade_from_tier");
     setIsRunning(true);
     setAnalysisSlowMsg(false);
-    setResult(null);
+    // Don't clear result immediately — keep previous result visible while the new one loads
+    // so upgraded tier badges/results don't disappear mid-run and confuse the user.
     setAnalysisId(null);
     setIsDemo(false);
     setShowSaferCode(false);
@@ -1308,8 +1318,8 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
                 </p>
               )}
 
-              {/* Upgrade prompt — UpgradeBox when we have an analysisId, fallback fresh purchase otherwise */}
-              {result.gated && analysisId && activeTier !== "max" && (
+              {/* Upgrade prompt — hidden while a new analysis is running to avoid stale IDs */}
+              {result.gated && analysisId && activeTier !== "max" && !isRunning && (
                 <UpgradeBox
                   currentTier={activeTier}
                   originalTier={originalTier}
