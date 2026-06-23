@@ -722,7 +722,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     });
   }
 
-  async function fetchUpgradedAnalysis(id: number, upgradeSessionId?: string, storedFromTier?: string, rawPending?: string) {
+  async function fetchUpgradedAnalysis(id: number, upgradeSessionId?: string, storedFromTier?: string, rawPending?: string, codeOverride?: string) {
     const fp = getFingerprint();
     setIsUpgrading(true);
     try {
@@ -746,7 +746,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         setActiveTier(newTier);
         setResult(data);
         setAnalysisId(id);
-        onResult?.(data, code, data.projectName ?? undefined, prevTier);
+        onResult?.(data, codeOverride ?? code, data.projectName ?? undefined, prevTier);
         void queryClient.invalidateQueries({ queryKey: ['/api/code-analyses'] });
         // Only clear pending_upgrade after confirmed success
         localStorage.removeItem("pending_upgrade");
@@ -815,7 +815,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         // fetchUpgradedAnalysis restores it on failure so the user can retry by refreshing.
         localStorage.removeItem("pending_upgrade");
         localStorage.removeItem("asof_upgrade_from_tier");
-        if (pendingId) fetchUpgradedAnalysis(pendingId, pendingSession ?? undefined, storedFromTier, raw);
+        if (pendingId) fetchUpgradedAnalysis(pendingId, pendingSession ?? undefined, storedFromTier, raw, pendingCode ?? undefined);
       } catch { localStorage.removeItem("pending_upgrade"); }
     }
 
