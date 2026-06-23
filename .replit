@@ -48,4 +48,6 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.development]
-ALLOW_DEV_PAYMENTS = "true"
+
+[userenv.shared]
+ALLOW_DEV_PAYMENTS = "false"
