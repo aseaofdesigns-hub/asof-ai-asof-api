@@ -3,7 +3,6 @@ import { runMigrations } from 'stripe-replit-sync';
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { securityHeaders, corsPolicy, apiLimiter, apiNotFound } from "./middleware/security";
 
@@ -40,36 +39,6 @@ async function initStripe() {
     await runMigrations({ databaseUrl });
     console.log('Stripe schema ready');
 
-    const stripeSync = await getStripeSync();
-
-    console.log('Setting up managed webhook...');
-    const domain = process.env.REPLIT_DOMAINS?.split(',')[0];
-    if (domain) {
-      const webhookBaseUrl = `https://${domain}`;
-      try {
-        const result = await stripeSync.findOrCreateManagedWebhook(
-          `${webhookBaseUrl}/api/stripe/webhook`
-        );
-        if (result?.webhook?.url) {
-          console.log(`Webhook configured: ${result.webhook.url}`);
-        } else {
-          console.log('Webhook setup skipped (no webhook returned)');
-        }
-      } catch (webhookErr) {
-        console.log('Webhook setup skipped:', webhookErr);
-      }
-    } else {
-      console.log('Webhook setup skipped (no domain available)');
-    }
-
-    console.log('Syncing Stripe data...');
-    stripeSync.syncBackfill()
-      .then(() => {
-        console.log('Stripe data synced');
-      })
-      .catch((err: any) => {
-        console.error('Error syncing Stripe data:', err);
-      });
   } catch (error) {
     console.error('Failed to initialize Stripe:', error);
   }
