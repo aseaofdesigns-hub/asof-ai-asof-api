@@ -120,7 +120,16 @@ export default function VerifyPayment() {
                 <Button
                   data-testid="button-go-home"
                   className="w-full"
-                  onClick={() => setLocation("/")}
+                  onClick={() => {
+                    if (isUpgrade && data?.analysisId) {
+                      localStorage.setItem("pending_upgrade", JSON.stringify({
+                        analysisId: data.analysisId,
+                        tier: data.tier,
+                        sessionId,
+                      }));
+                    }
+                    setLocation("/");
+                  }}
                 >
                   {isUpgrade ? "View Upgraded Analysis" : "Run Analysis Now"}
                 </Button>

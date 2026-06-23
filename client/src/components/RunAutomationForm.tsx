@@ -745,13 +745,16 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         toast({ title: "Upgrade applied!", description: `Now showing ${newTier.toUpperCase()} tier results.` });
       } else {
         const err = await res.json().catch(() => ({}));
-        // Only restore pending_upgrade for server errors (5xx) — 4xx means the session/analysis is invalid, don't loop
-        if (rawPending && res.status >= 500) localStorage.setItem("pending_upgrade", rawPending);
-        toast({ title: "Upgrade load failed", description: err.message ?? "Could not load upgraded analysis. Please try again.", variant: "destructive" });
+        // Always restore pending_upgrade so the user can retry — a paid upgrade should never be permanently lost
+        if (rawPending) localStorage.setItem("pending_upgrade", rawPending);
+        const desc = err.message ?? "Could not load upgraded analysis. Please refresh to try again.";
+        console.error("[upgrade] fetch failed", res.status, err);
+        toast({ title: "Upgrade load failed", description: desc, variant: "destructive" });
       }
-    } catch {
+    } catch (err) {
       // Network error — restore so user can retry on next load
       if (rawPending) localStorage.setItem("pending_upgrade", rawPending);
+      console.error("[upgrade] network error", err);
       toast({ title: "Upgrade load failed", description: "Network error — please refresh and try again.", variant: "destructive" });
     } finally {
       setIsUpgrading(false);
