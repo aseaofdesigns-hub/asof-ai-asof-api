@@ -830,8 +830,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       if (upgradeAnalysisId && fromTier) {
         localStorage.setItem("asof_upgrade_from_tier", fromTier);
       }
-      if (window.self !== window.top) window.open(url, '_blank');
-      else window.location.href = url;
+      window.location.href = url;
     } catch (err) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Payment failed", variant: "destructive" });
     }
