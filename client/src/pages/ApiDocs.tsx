@@ -524,40 +524,40 @@ console.log(data.data.confidence); // 0.98 for MAX tier`;
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   <tr>
-                    <td className="py-2">Verdict & Confidence Score</td>
-                    <td className="text-center">Yes</td>
-                    <td className="text-center">Yes</td>
-                    <td className="text-center">Yes</td>
+                    <td className="py-2">Risk Verdict + Summary</td>
+                    <td className="text-center text-emerald-400">✓</td>
+                    <td className="text-center text-emerald-400">✓</td>
+                    <td className="text-center text-emerald-400">✓</td>
                   </tr>
                   <tr>
-                    <td className="py-2">Evidence Array</td>
-                    <td className="text-center text-muted-foreground">No</td>
-                    <td className="text-center">Yes</td>
-                    <td className="text-center">Yes</td>
+                    <td className="py-2">Hidden Assumptions (with severity)</td>
+                    <td className="text-center text-emerald-400">✓</td>
+                    <td className="text-center text-emerald-400">✓</td>
+                    <td className="text-center text-emerald-400">✓</td>
                   </tr>
                   <tr>
-                    <td className="py-2">Explanation Text</td>
-                    <td className="text-center text-muted-foreground">No</td>
-                    <td className="text-center">Yes</td>
-                    <td className="text-center">Yes</td>
+                    <td className="py-2">What Could Break</td>
+                    <td className="text-center text-emerald-400">✓</td>
+                    <td className="text-center text-emerald-400">✓</td>
+                    <td className="text-center text-emerald-400">✓</td>
                   </tr>
                   <tr>
-                    <td className="py-2">Conflict Detection</td>
-                    <td className="text-center text-muted-foreground">No</td>
-                    <td className="text-center text-muted-foreground">No</td>
-                    <td className="text-center">Yes</td>
+                    <td className="py-2">Verify Checklist</td>
+                    <td className="text-center text-muted-foreground">—</td>
+                    <td className="text-center text-emerald-400">✓</td>
+                    <td className="text-center text-emerald-400">✓</td>
                   </tr>
                   <tr>
-                    <td className="py-2">Priority Processing</td>
-                    <td className="text-center text-muted-foreground">No</td>
-                    <td className="text-center text-muted-foreground">No</td>
-                    <td className="text-center">Yes</td>
+                    <td className="py-2">Suggestion Cards (how to fix each issue)</td>
+                    <td className="text-center text-muted-foreground">—</td>
+                    <td className="text-center text-emerald-400">✓</td>
+                    <td className="text-center text-emerald-400">✓</td>
                   </tr>
                   <tr>
-                    <td className="py-2">Confidence Level</td>
-                    <td className="text-center">~87%</td>
-                    <td className="text-center">~92%</td>
-                    <td className="text-center">~98%</td>
+                    <td className="py-2">Safer Code Rewrite (side-by-side)</td>
+                    <td className="text-center text-muted-foreground">—</td>
+                    <td className="text-center text-muted-foreground">—</td>
+                    <td className="text-center text-emerald-400">✓</td>
                   </tr>
                 </tbody>
               </table>
