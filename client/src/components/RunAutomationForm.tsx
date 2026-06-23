@@ -745,12 +745,12 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         toast({ title: "Upgrade applied!", description: `Now showing ${newTier.toUpperCase()} tier results.` });
       } else {
         const err = await res.json().catch(() => ({}));
-        // Restore pending_upgrade so the user can retry on next load
-        if (rawPending) localStorage.setItem("pending_upgrade", rawPending);
+        // Only restore pending_upgrade for server errors (5xx) — 4xx means the session/analysis is invalid, don't loop
+        if (rawPending && res.status >= 500) localStorage.setItem("pending_upgrade", rawPending);
         toast({ title: "Upgrade load failed", description: err.message ?? "Could not load upgraded analysis. Please try again.", variant: "destructive" });
       }
     } catch {
-      // Restore pending_upgrade so the user can retry on next load
+      // Network error — restore so user can retry on next load
       if (rawPending) localStorage.setItem("pending_upgrade", rawPending);
       toast({ title: "Upgrade load failed", description: "Network error — please refresh and try again.", variant: "destructive" });
     } finally {
@@ -855,6 +855,9 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       toast({ title: "Paste some code first", description: "Add at least a few lines of AI-generated code to analyze.", variant: "destructive" });
       return;
     }
+    // Clear any stale upgrade state so a fresh analysis always shows its own tier result
+    localStorage.removeItem("pending_upgrade");
+    localStorage.removeItem("asof_upgrade_from_tier");
     setIsRunning(true);
     setAnalysisSlowMsg(false);
     setResult(null);

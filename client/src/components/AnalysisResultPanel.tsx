@@ -263,11 +263,11 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { label: "Assumptions", count: assumptions.length, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-                    { label: "What Could Break", count: risks.length, color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
-                    { label: "Suggestions", count: suggestions.length, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
-                    { label: "Safe Rewrite", count: result.safer_code ? 1 : 0, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-                  ].map(s => (
+                    { label: "Assumptions", count: assumptions.length, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", show: true },
+                    { label: "What Could Break", count: risks.length, color: "text-red-400", bg: "bg-red-500/10 border-red-500/20", show: true },
+                    { label: "Suggestions", count: suggestions.length, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20", show: suggestions.length > 0 },
+                    { label: "Safe Rewrite", count: result.safer_code ? 1 : 0, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20", show: !!result.safer_code },
+                  ].filter(s => s.show).map(s => (
                     <div key={s.label} className={`rounded-xl p-4 border text-center ${s.bg}`}>
                       <p className={`text-2xl font-bold ${s.color}`}>{s.count}</p>
                       <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider">{s.label}</p>
