@@ -1,0 +1,142 @@
+AI Code Assumption Analysis Report
+Project: SQL 1
+Generated: 6/22/2026, 10:45:34 PM
+MAX TIER
+Risk Level: CRITICAL 10% safe
+The function is vulnerable to SQL injection in both SELECT and UPDATE queries, compares plaintext passwords
+directly, and generates predictable session tokens with Math.random(). It also lacks basic error handling, input
+validation, and safe authentication behavior.
+Fix These First
+1
+An attacker can inject SQL through `email` in the first query, potentially reading
+arbitrary rows, bypassing authentication, or damaging the database depending on
+driver settings.
+2
+If `token` or `user.id` interpolation is ever attacker-influenced or unexpectedly malformed, the UPDATE query can
+also become injectable or fail unpredictably.
+3
+If the database stores plaintext passwords, a database leak exposes every user password immediately and
+enables credential stuffing on other services.
+What the AI Assumed
+HIGH The AI assumed `email` is trusted and safe to interpolate directly into `SELECT *
+FROM users WHERE email = '${email}'`.
+HIGH The AI assumed `user.id` is always numeric and safe to interpolate directly into `UPDATE users SET token =
+'${token}' WHERE id = ${user.id}`.
+HIGH The AI assumed passwords are stored in plaintext and that direct comparison with `user.password ===
+password` is acceptable.
+HIGH The AI assumed `Math.random().toString(36).substring(2)` produces tokens strong enough for authentication
+or session management.
+HIGH The AI assumed database operations will succeed and did not handle connection failures, malformed
+results, or update failures.
+MEDIUM The AI assumed `db.query(...)` returns an array directly as `users`, and that `users[0]` always has fields
+`password` and `id`.
+MEDIUM The AI assumed returning different messages for `User not found` and `Wrong password` is acceptable.
+ASOF.ai — asofai.com | Support@asofai.com Page 1
+ASOF.ai — AI Code Analysis Report (continued)
+MEDIUM The AI assumed `email` and `password` are non-empty strings and did not validate type, length, or format.
+What Could Break
+HIGH An attacker can inject SQL through `email` in the first query, potentially reading
+arbitrary rows, bypassing authentication, or damaging the database depending on
+driver settings.
+HIGH If `token` or `user.id` interpolation is ever attacker-influenced or unexpectedly malformed, the UPDATE query
+can also become injectable or fail unpredictably.
+HIGH If the database stores plaintext passwords, a database leak exposes every user password immediately and
+enables credential stuffing on other services.
+HIGH Using `Math.random()` for tokens makes them guessable or brute-forceable compared to cryptographically
+secure random generators.
+HIGH Because the function does not wrap queries in `try/catch`, database failures will throw unhandled exceptions
+and may crash request handlers or leak internal errors.
+MEDIUM Returning `User not found` versus `Wrong password` allows user enumeration by revealing whether an email
+exists.
+MEDIUM If `db.query` returns a driver-specific structure such as `{ rows: [...] }` instead of an array, `users.length` and
+`users[0]` may break at runtime.
+MEDIUM Missing validation on `email` and `password` can lead to unnecessary database load, confusing failures, and
+inconsistent behavior for non-string inputs.
+Verify Checklist
+[ ] Verify how `db.query` returns results in your driver: array, `{ rows }`, `[rows]`, or another
+shape.
+[ ] Verify that the `users.password` column stores bcrypt/argon2 hashes, not plaintext passwords.
+[ ] Verify that the runtime has access to Node.js `crypto` for secure token generation.
+[ ] Verify whether the `token` column is meant to store session tokens directly or whether tokens should instead be
+hashed before storage.
+[ ] Verify that the database library supports parameterized queries using placeholders such as `?` or `$1` and update
+the syntax to match your driver.
+[ ] Verify whether the `email` column is unique; if not, selecting `*` and using `users[0]` may authenticate the wrong
+account.
+[ ] Verify that authentication responses should not distinguish between unknown email and wrong password.
+[ ] Verify whether failed token persistence should block login; the current code assumes token update always
+succeeds.
+ASOF.ai — asofai.com | Support@asofai.com Page 2
+ASOF.ai — AI Code Analysis Report (continued)
+[ ] Verify acceptable input constraints for `email` and `password`, including maximum lengths.
+[ ] Verify whether you need rate limiting, account lockout, audit logging, or MFA around `loginUser`.
+Suggestion Cards
+SQL injection in SELECT query
+Why it matters:
+The string template in `SELECT * FROM users WHERE email = '${email}'` allows
+attacker-controlled SQL to be executed.
+Fix:
+Replace string interpolation with a parameterized query and pass `email` as a bound
+parameter.
+SQL injection in UPDATE query
+Why it matters:
+The string template in `UPDATE users SET token = '${token}' WHERE id = ${user.id}` relies on direct interpolation and can fail dangerously if
+values are malformed or attacker-controlled.
+Fix:
+Use a parameterized UPDATE query with placeholders for both `token` and `user.id`.
+Plaintext password comparison
+Why it matters:
+Comparing `user.password === password` implies plaintext storage or insecure handling of passwords, which is catastrophic if the database is
+leaked.
+Fix:
+Store password hashes using bcrypt or argon2 and verify with `bcrypt.compare()` or the equivalent hash verification function.
+Weak token generation
+Why it matters:
+`Math.random()` is not cryptographically secure and should not be used for authentication tokens.
+Fix:
+Generate tokens with `crypto.randomBytes(32).toString('hex')` or another CSPRNG-backed method.
+Missing error handling
+Why it matters:
+Any database error will currently throw and may crash the request path or leak implementation details.
+Fix:
+Wrap the function body in `try/catch`, log internally, and return a generic failure response.
+ASOF.ai — asofai.com | Support@asofai.com Page 3
+ASOF.ai — AI Code Analysis Report (continued)
+User enumeration
+Why it matters:
+Different messages for unknown email and wrong password reveal which accounts exist.
+Fix:
+Return the same generic message such as `Invalid credentials` for both cases.
+Unvalidated inputs
+Why it matters:
+Non-string or oversized values for `email` and `password` can cause runtime issues and unnecessary load.
+Fix:
+Validate type, trim and normalize `email`, and enforce reasonable length limits before querying.
+Driver-specific query result assumptions
+Why it matters:
+The code assumes `db.query` returns an array in `users`, which may not match your DB client and can break authentication.
+Fix:
+Normalize the query result shape or rewrite the code to use the exact return format of your database library.
+Suggested Safe Rewrite
+ASOF.ai — asofai.com | Support@asofai.com Page 4
+ASOF.ai — AI Code Analysis Report (continued)
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+function normalizeQueryResult(result) {
+ if (Array.isArray(result)) {
+ return result;
+ }
+ if (result && Array.isArray(result.rows)) {
+ return result.rows;
+ }
+ if (Array.isArray(result?.[0])) {
+ return result[0];
+ }
+ return [];
+}
+async function loginUser(email, password) {
+ try {
+ if (typeof email !== 'string' || typeof password !== 'string') {
+ return { success: false, message: 'Invalid credentials' };
+ }
+ const normalizedEmail = email.trim().toLowerCase();
