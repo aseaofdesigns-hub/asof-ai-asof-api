@@ -57,6 +57,17 @@ export const analyzeLimiter = rateLimit({
   message: { error: "Analysis rate limit reached. Please wait a moment." },
 });
 
+// Sustained-abuse cap: limits total analyses per IP per hour. Because this is
+// keyed on IP (not the browser fingerprint), it also bounds people who switch
+// browsers / use incognito to farm fresh free trials from the same connection.
+export const analyzeHourlyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Hourly analysis limit reached. Please try again later." },
+});
+
 export function apiNotFound(req: Request, res: Response, next: NextFunction) {
   if (req.path.startsWith("/api/")) {
     return res.status(404).json({ error: "Endpoint not found" });

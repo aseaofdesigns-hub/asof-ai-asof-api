@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { analyzeLimiter, apiNotFound } from "./middleware/security";
+import { analyzeLimiter, analyzeHourlyLimiter, apiNotFound } from "./middleware/security";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
@@ -1189,7 +1189,7 @@ export async function registerRoutes(
   });
 
   // ── AI-powered code analysis ──────────────────────────────────────────────
-  app.post('/api/analyze-code', analyzeLimiter, async (req, res) => {
+  app.post('/api/analyze-code', analyzeLimiter, analyzeHourlyLimiter, async (req, res) => {
     try {
       const { code, prompt: userPrompt, sessionId, fingerprint, tier: explicitTier, projectName } = req.body;
 
