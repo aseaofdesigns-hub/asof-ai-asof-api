@@ -31,3 +31,9 @@ services:
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
+      # Optional fallback AI: if set, analyses retry on Anthropic Claude when
+      # OpenAI fails. Leave unset to disable the fallback (no effect on normal runs).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-8

@@ -17,6 +17,45 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+// Fallback AI provider: if OpenAI is down / rate-limited / over budget, retry the
+// same code analysis on Anthropic Claude. Only active when ANTHROPIC_API_KEY is set;
+// returns the raw JSON string (same shape the OpenAI path produces).
+async function analyzeWithClaude(systemPrompt: string, userMessage: string): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.ANTHROPIC_MODEL || "claude-opus-4-8",
+      max_tokens: 4096,
+      system: systemPrompt + "\n\nReturn ONLY the JSON object — no markdown code fences, no commentary.",
+      messages: [{ role: "user", content: userMessage }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`Anthropic ${resp.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const data: any = await resp.json();
+  let text: string = Array.isArray(data?.content)
+    ? data.content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("")
+    : "";
+  text = text.trim();
+  // Strip ```json … ``` fences if the model added them despite instructions.
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+  return text || "{}";
+}
+
 type AsOfSignal = {
   source?: string;
   priority?: number;
@@ -1258,17 +1297,25 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
         ? `Original prompt: "${userPrompt}"\n\nAI-generated code:\n\`\`\`\n${code}\n\`\`\``
         : `AI-generated code:\n\`\`\`\n${code}\n\`\`\``;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-5.4",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage }
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 4096,
-      });
-
-      const raw = completion.choices[0]?.message?.content ?? '{}';
+      let raw: string;
+      try {
+        const completion = await openai.chat.completions.create({
+          model: "gpt-5.4",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage }
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 4096,
+        });
+        raw = completion.choices[0]?.message?.content ?? '{}';
+      } catch (openaiErr: any) {
+        // OpenAI failed (outage, 429, billing/quota). Fall back to Claude if an
+        // Anthropic key is configured; otherwise surface the original error.
+        if (!process.env.ANTHROPIC_API_KEY) throw openaiErr;
+        console.warn('OpenAI analysis failed, falling back to Claude:', openaiErr?.message ?? openaiErr);
+        raw = await analyzeWithClaude(systemPrompt, userMessage);
+      }
       let analysis: any;
       try {
         analysis = JSON.parse(raw);
