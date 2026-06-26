@@ -29,6 +29,7 @@ export const codeAnalysisResultSchema = z.object({
   gated: z.boolean().optional(),
   gated_tier: z.string().optional(),
   tier: z.string().optional(),
+  isSample: z.boolean().optional(),
   analysisId: z.number().optional(),
 });
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Copy, Check, Maximize2, ChevronRight, Download, AlertTriangle, XCircle, CheckCircle2, ShieldCheck, Lock } from "lucide-react";
+import { X, Copy, Check, Maximize2, ChevronRight, Download, AlertTriangle, XCircle, CheckCircle2, ShieldCheck, Lock, Eye } from "lucide-react";
 import type { CodeAnalysisResult } from "@shared/routes";
 
 type Tab = "summary" | "assumptions" | "risks" | "suggestions" | "rewrite";
@@ -154,6 +154,19 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
         transition={{ duration: 0.4 }}
         className="glass-card rounded-2xl border border-white/10 overflow-hidden"
       >
+        {/* Sample / example notice */}
+        {result.isSample && (
+          <div className="px-6 py-2.5 border-b border-orange-500/30 bg-orange-500/15 flex items-center gap-2.5">
+            <Eye className="w-4 h-4 text-orange-300 shrink-0" />
+            <span className="text-[11px] font-bold text-orange-200 uppercase tracking-widest px-2 py-0.5 rounded bg-orange-500/20 border border-orange-500/40">
+              Sample
+            </span>
+            <span className="text-[11px] text-orange-100/80 leading-snug">
+              Example output showing what a paid report includes — not a real analysis of your code.
+            </span>
+          </div>
+        )}
+
         {/* Upgrade confirmation banner */}
         {upgradedFrom && result.tier && upgradedFrom !== result.tier && (
           <motion.div

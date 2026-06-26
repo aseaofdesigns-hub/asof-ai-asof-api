@@ -330,6 +330,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
   const FOOTER_H = 16;
   const MAX_Y = pageH - FOOTER_H - 4;
   const now = new Date();
+  const isSample = !!result.isSample;
 
   const SEV_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
   const SEV_RGB: Record<string, [number,number,number]> = {
@@ -364,6 +365,14 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
     doc.setFont("helvetica", "bold");
     doc.text("ASOF.ai — AI Code Analysis Report (continued)", M, 7);
     y = 18;
+    if (isSample) drawSampleWatermark();
+  }
+
+  function drawSampleWatermark() {
+    doc.setTextColor(234, 215, 186);
+    doc.setFontSize(64);
+    doc.setFont("helvetica", "bold");
+    doc.text("SAMPLE", pageW / 2, pageH / 2, { align: "center", angle: 32 });
   }
 
   function checkY(need: number) { if (y + need > MAX_Y) newPage(); }
@@ -419,7 +428,17 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
   } else {
     doc.text(`Generated: ${now.toLocaleString()}`, iconPng ? M + 16 : M, 34);
   }
-  if (result.tier) {
+  if (isSample) {
+    const tierLabel = "SAMPLE - DEMO DATA";
+    doc.setDrawColor(249, 115, 22);
+    doc.setLineWidth(0.5);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    const tw = doc.getTextWidth(tierLabel) + 8;
+    doc.roundedRect(pageW - M - tw, 28, tw, 8, 2, 2, "S");
+    doc.setTextColor(249, 160, 90);
+    doc.text(tierLabel, pageW - M - tw + 4, 34);
+  } else if (result.tier) {
     const tierLabel = result.tier.toUpperCase() + " TIER";
     doc.setFillColor(168, 85, 247, 0.3);
     doc.setDrawColor(168, 85, 247);
@@ -433,6 +452,8 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
   }
 
   y = 56;
+
+  if (isSample) drawSampleWatermark();
 
   // ── 1. RISK SUMMARY ─────────────────────────────────────────────
   const rc = RISK_RGB[result.risk_level] ?? [107,114,128];
@@ -783,7 +804,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
   const showMockResult = () => {
     const ex = currentExampleRef.current;
-    if (ex) onResult?.(ex.result, ex.code);
+    if (ex) onResult?.({ ...ex.result, isSample: true }, ex.code);
   };
 
   useEffect(() => {
