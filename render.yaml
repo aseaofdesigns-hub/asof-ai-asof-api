@@ -1,0 +1,33 @@
+# Render Blueprint for ASOF.ai — deploys the app as a single Node web service.
+# Render reads this when you create a new "Blueprint" from this repo.
+# Secrets marked `sync: false` are NOT stored here — Render will prompt you to
+# paste them into its dashboard, keeping keys out of the public repo.
+services:
+  - type: web
+    name: asof-ai
+    runtime: node
+    plan: free
+    # --include=dev is required: the build needs vite/tsx/esbuild (devDependencies),
+    # which npm would otherwise skip because NODE_ENV=production.
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: node dist/index.cjs
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # Force real Stripe in production (no dev payment bypass).
+      - key: ALLOW_DEV_PAYMENTS
+        value: "false"
+      # Render generates a strong random session secret for you.
+      - key: SESSION_SECRET
+        generateValue: true
+      # --- You paste these in the Render dashboard when prompted ---
+      - key: DATABASE_URL
+        sync: false
+      - key: AI_INTEGRATIONS_OPENAI_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
