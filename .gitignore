@@ -6,3 +6,22 @@ vite.config.ts.*
 *.tar.gz
 *.sql
 ChatGPT
+
+# Secrets / environment (never commit credentials)
+.env
+.env.*
+Secrets.txt
+ASOF-ai-production-DATABASE_URL.txt
+Environment variables*.txt
+
+# Replit runtime dirs
+.config/
+.local/
+
+# Database schema dumps + data exports (contain real customer/payment data)
+Database sche*.txt
+production-*.csv
+production-*.json
+signals.csv
+signals.json
+*.xlsx
