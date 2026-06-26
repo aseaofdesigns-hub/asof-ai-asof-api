@@ -6,6 +6,7 @@ import type { Request, Response, NextFunction } from "express";
 const allowedOrigins = [
   "https://asofai.com",
   "https://www.asofai.com",
+  /\.onrender\.com$/,
   /\.replit\.app$/,
   /\.replit\.dev$/,
   /^http:\/\/localhost/,
