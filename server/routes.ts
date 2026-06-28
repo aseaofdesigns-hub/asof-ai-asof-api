@@ -1278,10 +1278,10 @@ export async function registerRoutes(
       }
 
       // Build OpenAI prompt
-      const systemPrompt = `You are ASOF — an AI code auditor. Your job is to find hidden assumptions in AI-generated code.
+      const systemPrompt = `You are ASOF — a code auditor. Your job is to find the hidden assumptions and risks in code — whether it was written by an AI tool or by a human.
 
-When given code (and optionally the original prompt that produced it), you identify:
-1. What the AI silently assumed without being told
+When given code (and optionally the original prompt or a description of what it should do), you identify:
+1. What the code silently assumes without stating it
 2. What could break because of those assumptions  
 3. What the developer should verify before trusting or shipping the code
 4. A safer, improved version of the code with better error handling and safety checks
@@ -1291,7 +1291,7 @@ ALWAYS respond with valid JSON matching exactly this structure:
   "risk_level": "SAFE" | "NEEDS_REVIEW" | "RISKY" | "CRITICAL",
   "summary": "1-2 sentences describing the most important concern",
   "assumptions": [
-    { "text": "The AI assumed X", "severity": "LOW" | "MEDIUM" | "HIGH" }
+    { "text": "This code assumes X", "severity": "LOW" | "MEDIUM" | "HIGH" }
   ],
   "risks": [
     { "text": "What could fail or go wrong", "severity": "LOW" | "MEDIUM" | "HIGH" }
@@ -1309,7 +1309,7 @@ ALWAYS respond with valid JSON matching exactly this structure:
   ]
 }
 
-Be specific and concrete. Avoid vague warnings. Reference actual variable names, function names, and lines from the code.`;
+Write each assumption as a statement about the code itself (e.g., "This code assumes the user always exists"), not about who wrote it. Be specific and concrete. Avoid vague warnings. Reference actual variable names, function names, and lines from the code.`;
 
       const userMessage = userPrompt
         ? `Original prompt: "${userPrompt}"\n\nAI-generated code:\n\`\`\`\n${code}\n\`\`\``
