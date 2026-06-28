@@ -27,7 +27,7 @@ const EXAMPLES: Array<{ code: string; prompt: string; result: CodeAnalysisResult
 }`,
     result: {
       risk_level: "CRITICAL",
-      summary: "This AI-generated auth middleware will crash on every unauthenticated request — it calls .split() on an undefined Authorization header with no guard. Anyone who hits an endpoint without a token gets an unhandled TypeError that crashes the request handler instead of a clean 401.",
+      summary: "This auth middleware will crash on every unauthenticated request — it calls .split() on an undefined Authorization header with no guard. Anyone who hits an endpoint without a token gets an unhandled TypeError that crashes the request handler instead of a clean 401.",
       assumptions: [
         { severity: "HIGH", text: "Assumes req.headers.authorization always exists and is a valid 'Bearer <token>' string. Any missing or malformed header throws a TypeError before any auth check runs." },
         { severity: "HIGH", text: "Assumes jwt.verify() always returns a decoded user object. If the token is expired or tampered with, jwt.verify() throws — but there's no try/catch, so the error propagates uncaught." },
@@ -105,7 +105,7 @@ const EXAMPLES: Array<{ code: string; prompt: string; result: CodeAnalysisResult
 }`,
     result: {
       risk_level: "NEEDS_REVIEW",
-      summary: "This AI-generated function fetches user profiles with Redis caching but never checks whether the API call succeeded. A 404 or 500 response gets parsed and cached as valid user data — callers will receive that corrupted payload for a full hour before it expires.",
+      summary: "This function fetches user profiles with Redis caching but never checks whether the API call succeeded. A 404 or 500 response gets parsed and cached as valid user data — callers will receive that corrupted payload for a full hour before it expires.",
       assumptions: [
         { severity: "HIGH", text: "Assumes the external API always returns a valid JSON user object. A 404 or 500 still returns JSON, which gets parsed and written to cache as if it were real user data." },
         { severity: "MEDIUM", text: "Assumes redis.get() returns null on a cache miss and never throws. If Redis is unavailable, the function crashes instead of falling back to the live API." },
@@ -210,7 +210,7 @@ const EXAMPLES: Array<{ code: string; prompt: string; result: CodeAnalysisResult
 }`,
     result: {
       risk_level: "RISKY",
-      summary: "This AI-generated function charges a card and creates an order in two separate steps with no transaction safety. If the database write fails after the charge succeeds, you'll have a customer billed but no order record — with no automatic rollback or retry logic.",
+      summary: "This function charges a card and creates an order in two separate steps with no transaction safety. If the database write fails after the charge succeeds, you'll have a customer billed but no order record — with no automatic rollback or retry logic.",
       assumptions: [
         { severity: "HIGH", text: "Assumes the Stripe charge will always complete before the database write, with no handling for partial failures between the two operations." },
         { severity: "HIGH", text: "Assumes `user.stripeCustomerId` always exists — if the user has no saved Stripe customer, this silently passes `undefined` to Stripe." },
@@ -885,7 +885,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
   const runAnalysis = async (asFree = false) => {
     if (!code.trim()) {
-      toast({ title: "Paste some code first", description: "Add at least a few lines of AI-generated code to analyze.", variant: "destructive" });
+      toast({ title: "Paste some code first", description: "Add at least a few lines of code to analyze.", variant: "destructive" });
       return;
     }
     // Clear any stale upgrade state so a fresh analysis always shows its own tier result
@@ -989,7 +989,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             <span>Test<br />It<br />Out</span>
           </button>
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Paste any code — from Cursor, Claude, ChatGPT, or written by hand — and ASOF finds every hidden assumption and what could break. New here? Hit <span className="text-yellow-400 font-medium">Test It Out</span> to see a real example.</p>
+        <p className="text-xs text-muted-foreground">Is your code right? Paste it — whether you wrote it yourself or an AI did — and ASOF finds every hidden assumption and what could break before you ship. Perfect for double-checking your own work. New here? Hit <span className="text-yellow-400 font-medium">Test It Out</span> to see a real example.</p>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
@@ -1381,11 +1381,11 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
 const TIPS = [
   { emoji: "🎯", text: "Be specific — tell the AI what language, framework, and constraints you're working with before asking it to write code." },
-  { emoji: "🚨", text: "Never trust AI-generated auth, payment, or permission code without a manual audit. These are the highest-risk areas." },
+  { emoji: "🚨", text: "Never trust auth, payment, or permission code without a manual audit — whether you wrote it or an AI did. These are the highest-risk areas." },
   { emoji: "🔄", text: "Ask the AI: 'What assumptions did you make writing this?' — it often surfaces hidden risks you can then check." },
   { emoji: "⚠️", text: "Check all imports — AI sometimes references packages that don't exist, are deprecated, or have breaking API changes." },
   { emoji: "💸", text: "Money-handling code needs idempotency keys, rollback logic, and atomic transactions. AI rarely includes these by default." },
-  { emoji: "🕳️", text: "Test null and empty inputs — AI-generated code often skips edge-case validation on function arguments." },
+  { emoji: "🕳️", text: "Test null and empty inputs — code often skips edge-case validation on function arguments." },
   { emoji: "🔐", text: "Ask the AI to include error handling in the same prompt, not as a follow-up — it's harder to bolt on safely after the fact." },
   { emoji: "📦", text: "Paste the original prompt alongside the code — ASOF uses it to find assumptions the AI made based on what you asked for." },
   { emoji: "🧪", text: "AI code that works in dev can silently fail in production due to env differences, missing secrets, or different DB states." },
