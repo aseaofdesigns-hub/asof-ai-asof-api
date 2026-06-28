@@ -117,6 +117,7 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
   const [tab, setTab] = useState<Tab>("summary");
   const [modal, setModal] = useState<ModalData>(null);
 
+  const isPrompt = result.mode === 'prompt';
   const assumptions = (result.assumptions ?? []).slice().sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
   const risks = (result.risks ?? []).slice().sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
   const suggestions = result.suggestions ?? [];
@@ -396,19 +397,21 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
                 {isTabLocked("rewrite") ? (
                   <div className="relative rounded-xl overflow-hidden">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 blur-sm pointer-events-none select-none opacity-40">
-                      <CodePanel label="Original AI Code" code={originalCode} />
-                      <CodePanel label="🚦 Safer Suggested Code" code={result.safer_code} accent />
+                      <CodePanel label={isPrompt ? "Your Original Prompt" : "Original AI Code"} code={originalCode} />
+                      <CodePanel label={isPrompt ? "✨ Rewritten Prompt" : "🚦 Safer Suggested Code"} code={result.safer_code} accent />
                     </div>
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/50 backdrop-blur-[2px] rounded-xl">
                       <Lock className="w-7 h-7 text-yellow-400" />
                       <p className="text-sm font-bold text-white">Unlock with ASOF Max</p>
-                      <p className="text-xs text-white/60 text-center max-w-xs">The side-by-side safer code rewrite is exclusive to Max ($2.50) — the full fixed version alongside your original.</p>
+                      <p className="text-xs text-white/60 text-center max-w-xs">{isPrompt
+                        ? "The side-by-side prompt rewrite is exclusive to Max ($2.50) — your sharpened, ready-to-send prompt alongside your original."
+                        : "The side-by-side safer code rewrite is exclusive to Max ($2.50) — the full fixed version alongside your original."}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <CodePanel label="Original AI Code" code={originalCode} />
-                    <CodePanel label="🚦 Safer Suggested Code" code={result.safer_code} accent />
+                    <CodePanel label={isPrompt ? "Your Original Prompt" : "Original AI Code"} code={originalCode} />
+                    <CodePanel label={isPrompt ? "✨ Rewritten Prompt" : "🚦 Safer Suggested Code"} code={result.safer_code} accent />
                   </div>
                 )}
               </motion.div>

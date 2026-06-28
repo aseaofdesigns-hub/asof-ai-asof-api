@@ -331,6 +331,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
   const MAX_Y = pageH - FOOTER_H - 4;
   const now = new Date();
   const isSample = !!result.isSample;
+  const isPrompt = result.mode === 'prompt';
 
   const SEV_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
   const SEV_RGB: Record<string, [number,number,number]> = {
@@ -363,7 +364,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
     doc.setTextColor(160, 140, 200);
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    doc.text("ASOF.ai — AI Code Analysis Report (continued)", M, 7);
+    doc.text(isPrompt ? "ASOF.ai — AI Prompt Analysis Report (continued)" : "ASOF.ai — AI Code Analysis Report (continued)", M, 7);
     y = 18;
     if (isSample) drawSampleWatermark();
   }
@@ -416,7 +417,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(180, 150, 230);
-  doc.text("AI Code Assumption Analysis Report", iconPng ? M + 16 : M, 26);
+  doc.text(isPrompt ? "AI Prompt Assumption Analysis Report" : "AI Code Assumption Analysis Report", iconPng ? M + 16 : M, 26);
   doc.setTextColor(130, 120, 160);
   if (projectName) {
     doc.setTextColor(200, 180, 255);
@@ -514,7 +515,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
 
   // ── 3. WHAT THE AI ASSUMED ───────────────────────────────────────
   if (result.assumptions?.length) {
-    sectionHeader("What the AI Assumed");
+    sectionHeader(isPrompt ? "What This Prompt Assumes" : "What the AI Assumed");
     const sorted = [...result.assumptions].sort(
       (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9)
     );
@@ -609,30 +610,50 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
     }
   }
 
-  // ── 7. SAFER CODE REWRITE (Max) ──────────────────────────────────
+  // ── 7. SAFER CODE / PROMPT REWRITE (Max) ─────────────────────────
   if (result.safer_code) {
-    sectionHeader("Suggested Safe Rewrite");
-    const codeLines = result.safer_code.split("\n");
-    const lineH = 4.2;
-    const visLines = Math.min(codeLines.length, Math.floor((MAX_Y - y - 12) / lineH));
-    const blockH = visLines * lineH + 10;
-    checkY(blockH + 6);
+    sectionHeader(isPrompt ? "Suggested Prompt Rewrite" : "Suggested Safe Rewrite");
 
-    doc.setFillColor(14, 12, 28);
-    doc.setDrawColor(80, 50, 120);
-    doc.setLineWidth(0.4);
-    doc.roundedRect(M, y - 2, cW, blockH, 2, 2, "FD");
+    if (isPrompt) {
+      // A rewritten prompt is prose — render it as full, wrapped, paginated
+      // text (not a truncated code terminal) so nothing gets cut off.
+      doc.setFontSize(9.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(45, 35, 65);
+      const lineH = 5;
+      const paras = result.safer_code.split("\n");
+      for (const para of paras) {
+        const lines = doc.splitTextToSize(para.trim() === "" ? " " : para, cW - 8);
+        for (const ln of lines) {
+          checkY(lineH + 2);
+          doc.text(ln, M + 4, y);
+          y += lineH;
+        }
+      }
+      y += 8;
+    } else {
+      const codeLines = result.safer_code.split("\n");
+      const lineH = 4.2;
+      const visLines = Math.min(codeLines.length, Math.floor((MAX_Y - y - 12) / lineH));
+      const blockH = visLines * lineH + 10;
+      checkY(blockH + 6);
 
-    doc.setFontSize(7.5);
-    doc.setFont("courier", "normal");
-    doc.setTextColor(180, 220, 180);
-    let cy = y + 5;
-    for (let i = 0; i < visLines; i++) {
-      const wrapped = doc.splitTextToSize(codeLines[i] || " ", cW - 10);
-      doc.text(wrapped[0] ?? " ", M + 5, cy);
-      cy += lineH;
+      doc.setFillColor(14, 12, 28);
+      doc.setDrawColor(80, 50, 120);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(M, y - 2, cW, blockH, 2, 2, "FD");
+
+      doc.setFontSize(7.5);
+      doc.setFont("courier", "normal");
+      doc.setTextColor(180, 220, 180);
+      let cy = y + 5;
+      for (let i = 0; i < visLines; i++) {
+        const wrapped = doc.splitTextToSize(codeLines[i] || " ", cW - 10);
+        doc.text(wrapped[0] ?? " ", M + 5, cy);
+        cy += lineH;
+      }
+      y += blockH + 8;
     }
-    y += blockH + 8;
   }
 
   // ── FOOTER on last page ──────────────────────────────────────────
@@ -644,6 +665,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const queryClient = useQueryClient();
   const [code, setCode] = useState("");
   const [userPrompt, setUserPrompt] = useState("");
+  const [mode, setMode] = useState<'code' | 'prompt'>("code");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<CodeAnalysisResult | null>(null);
   const [isDemo, setIsDemo] = useState(false);
@@ -825,6 +847,11 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       setUserPrompt(pendingPrompt);
       localStorage.removeItem("asof_pending_prompt");
     }
+    const pendingMode = localStorage.getItem("asof_pending_mode");
+    if (pendingMode === 'prompt' || pendingMode === 'code') {
+      setMode(pendingMode);
+      localStorage.removeItem("asof_pending_mode");
+    }
 
     // Check for pending upgrade (returned from Stripe after an upgrade payment)
     const raw = localStorage.getItem("pending_upgrade");
@@ -874,6 +901,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       }
       localStorage.setItem("asof_pending_code", code);
       localStorage.setItem("asof_pending_prompt", userPrompt);
+      localStorage.setItem("asof_pending_mode", mode);
       if (upgradeAnalysisId && fromTier) {
         localStorage.setItem("asof_upgrade_from_tier", fromTier);
       }
@@ -885,7 +913,9 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
 
   const runAnalysis = async (asFree = false) => {
     if (!code.trim()) {
-      toast({ title: "Paste some code first", description: "Add at least a few lines of code to analyze.", variant: "destructive" });
+      toast(mode === 'prompt'
+        ? { title: "Paste your prompt first", description: "Add the prompt you want to send to an AI.", variant: "destructive" }
+        : { title: "Paste some code first", description: "Add at least a few lines of code to analyze.", variant: "destructive" });
       return;
     }
     // Clear any stale upgrade state so a fresh analysis always shows its own tier result
@@ -902,7 +932,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     setActiveTier("lite");
     const slowTimer = setTimeout(() => setAnalysisSlowMsg(true), 15000);
     try {
-      const body: any = { code, prompt: userPrompt || undefined, fingerprint: getFingerprint() };
+      const body: any = { code, prompt: userPrompt || undefined, fingerprint: getFingerprint(), mode };
       if (!asFree && paidSessionId) body.sessionId = paidSessionId;
       if (!asFree && ownerName.trim()) body.projectName = ownerName.trim();
 
@@ -950,7 +980,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
   const tiers = [
     { id: 'lite' as const, name: 'ASOF Lite', price: '$0.50', description: 'Risk level + all assumptions + what could break', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />, unlocks: ['Full assumption list', 'What could break'] },
     { id: 'pro' as const, name: 'ASOF Pro', price: '$1.00', description: 'Everything in Lite + verify checklist + suggestion cards', icon: <Zap className="w-4 h-4 text-blue-400" />, unlocks: ['Verify checklist', 'Detailed suggestion cards'] },
-    { id: 'max' as const, name: 'ASOF Max', price: '$2.50', description: 'Full analysis + safer code rewrite side-by-side', icon: <ShieldCheck className="w-4 h-4 text-purple-400" />, unlocks: ['Side-by-side safer code', 'Full rewrite'] },
+    { id: 'max' as const, name: 'ASOF Max', price: '$2.50', description: mode === 'prompt' ? 'Full analysis + side-by-side prompt rewrite' : 'Full analysis + safer code rewrite side-by-side', icon: <ShieldCheck className="w-4 h-4 text-purple-400" />, unlocks: mode === 'prompt' ? ['Side-by-side prompt rewrite', 'Ready to send'] : ['Side-by-side safer code', 'Full rewrite'] },
   ];
 
   const featureTable = [
@@ -959,7 +989,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
     { label: "What Could Break", lite: true, pro: true, max: true },
     { label: "Verify Checklist", lite: false, pro: true, max: true },
     { label: "Suggestion Cards", lite: false, pro: true, max: true },
-    { label: "Safer Code Rewrite", lite: false, pro: false, max: true },
+    { label: mode === 'prompt' ? "Prompt Rewrite" : "Safer Code Rewrite", lite: false, pro: false, max: true },
   ];
 
   return (
@@ -977,22 +1007,46 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center justify-between text-lg">
           <div className="flex items-center gap-2">
-            <Code2 className="w-5 h-5 text-primary" />
-            Analyze Your Code
+            {mode === 'prompt' ? <Sparkles className="w-5 h-5 text-primary" /> : <Code2 className="w-5 h-5 text-primary" />}
+            {mode === 'prompt' ? 'Check Your Prompt' : 'Analyze Your Code'}
           </div>
-          <button
-            data-testid="button-load-demo"
-            onClick={loadExample}
-            className="w-20 h-20 rounded-full border-2 border-yellow-400 bg-yellow-400/10 text-yellow-300 hover:bg-yellow-400/20 transition-all flex items-center justify-center text-center text-[9px] font-bold uppercase tracking-wide leading-snug shrink-0 px-1"
-            style={{ wordBreak: "break-word" }}
-          >
-            <span>Test<br />It<br />Out</span>
-          </button>
+          {mode === 'code' && (
+            <button
+              data-testid="button-load-demo"
+              onClick={loadExample}
+              className="w-20 h-20 rounded-full border-2 border-yellow-400 bg-yellow-400/10 text-yellow-300 hover:bg-yellow-400/20 transition-all flex items-center justify-center text-center text-[9px] font-bold uppercase tracking-wide leading-snug shrink-0 px-1"
+              style={{ wordBreak: "break-word" }}
+            >
+              <span>Test<br />It<br />Out</span>
+            </button>
+          )}
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Is your code right? Paste it — whether you wrote it yourself or an AI did — and ASOF finds every hidden assumption and what could break before you ship. Perfect for double-checking your own work. New here? Hit <span className="text-yellow-400 font-medium">Test It Out</span> to see a real example.</p>
+        {mode === 'prompt' ? (
+          <p className="text-xs text-muted-foreground">About to ask an AI to build something? Paste your prompt here first. ASOF finds what's vague or missing — and on <span className="text-purple-300 font-medium">Max</span> hands you a sharper, ready-to-send rewrite side-by-side.</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Is your code right? Paste it — whether you wrote it yourself or an AI did — and ASOF finds every hidden assumption and what could break before you ship. Perfect for double-checking your own work. New here? Hit <span className="text-yellow-400 font-medium">Test It Out</span> to see a real example.</p>
+        )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
+        {/* Mode toggle: Code vs Prompt */}
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-white/5 border border-white/10">
+          <button
+            data-testid="button-mode-code"
+            onClick={() => setMode("code")}
+            className={`flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${mode === "code" ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-white/50 hover:text-white/80"}`}
+          >
+            <Code2 className="w-3.5 h-3.5" /> Check Code
+          </button>
+          <button
+            data-testid="button-mode-prompt"
+            onClick={() => setMode("prompt")}
+            className={`flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${mode === "prompt" ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-white/50 hover:text-white/80"}`}
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Check Prompt
+          </button>
+        </div>
+
         {isExampleLoaded && (
           <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-500/8 border border-orange-500/20">
             <Eye className="w-4 h-4 text-orange-300 shrink-0" />
@@ -1011,7 +1065,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         {/* Code input — always visible */}
         <div className="space-y-2">
           <Label htmlFor="code-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            Your Code
+            {mode === 'prompt' ? 'Your Prompt' : 'Your Code'}
             {isExampleLoaded && exampleTier && (
               <span className="text-yellow-400 font-black tracking-widest">
                 {exampleTier.toUpperCase()}
@@ -1023,30 +1077,36 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             data-testid="input-code"
             value={code}
             onChange={e => { setCode(e.target.value); if (isExampleLoaded) setIsExampleLoaded(false); }}
-            placeholder="Paste any code — AI-generated or handwritten — auth flows, API routes, database queries, payment logic. ASOF finds the hidden assumptions and what could break before you ship it."
-            className="glass-input font-mono text-xs min-h-[160px] resize-y leading-relaxed"
+            placeholder={mode === 'prompt'
+              ? "Paste the prompt you're about to give an AI — e.g. 'Build a login page with email and password and remember me.' ASOF finds what's vague or missing before you send it."
+              : "Paste any code — AI-generated or handwritten — auth flows, API routes, database queries, payment logic. ASOF finds the hidden assumptions and what could break before you ship it."}
+            className={`glass-input text-xs min-h-[160px] resize-y leading-relaxed ${mode === 'prompt' ? '' : 'font-mono'}`}
             spellCheck={false}
           />
           <p className="text-[10px] text-white/30 leading-relaxed">
-            Works with any code — AI-generated or handwritten. Login systems, API routes, payment flows, database queries, webhooks, and more. ASOF finds the hidden assumptions and tells you exactly what could break before you ship it.
+            {mode === 'prompt'
+              ? "Works with any prompt for any AI tool (Claude, ChatGPT, Cursor, Copilot). ASOF spots the hidden assumptions and missing details — and on Max, rewrites the prompt for you, ready to send."
+              : "Works with any code — AI-generated or handwritten. Login systems, API routes, payment flows, database queries, webhooks, and more. ASOF finds the hidden assumptions and tells you exactly what could break before you ship it."}
           </p>
         </div>
 
-        {/* Optional prompt */}
-        <div className="space-y-2">
-          <Label htmlFor="prompt-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            What did you ask the AI to build? <span className="normal-case font-normal text-muted-foreground/60">(optional but improves accuracy)</span>
-          </Label>
-          <Textarea
-            id="prompt-input"
-            data-testid="input-prompt"
-            value={userPrompt}
-            onChange={e => setUserPrompt(e.target.value)}
-            placeholder="e.g. Build a function that charges a user's card and saves the order to the database"
-            className="glass-input text-xs min-h-[60px] resize-y leading-relaxed"
-            spellCheck={false}
-          />
-        </div>
+        {/* Optional prompt — only in code mode (in prompt mode the box above IS the prompt) */}
+        {mode === 'code' && (
+          <div className="space-y-2">
+            <Label htmlFor="prompt-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              What did you ask the AI to build? <span className="normal-case font-normal text-muted-foreground/60">(optional but improves accuracy)</span>
+            </Label>
+            <Textarea
+              id="prompt-input"
+              data-testid="input-prompt"
+              value={userPrompt}
+              onChange={e => setUserPrompt(e.target.value)}
+              placeholder="e.g. Build a function that charges a user's card and saves the order to the database"
+              className="glass-input text-xs min-h-[60px] resize-y leading-relaxed"
+              spellCheck={false}
+            />
+          </div>
+        )}
 
         {/* CTA area */}
         {freeTrialAvailable && !paidSessionId && (
@@ -1116,7 +1176,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
               disabled={isRunning || !code.trim() || !ownerName.trim() || !!usedProjectNames.includes(ownerName.trim().toLowerCase())}
               className="w-full h-11 font-semibold bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
             >
-              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{analysisSlowMsg ? "Still working..." : "Analyzing with AI..."}</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
+              {isRunning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{analysisSlowMsg ? "Still working..." : "Analyzing with AI..."}</> : mode === 'prompt' ? <><Sparkles className="mr-2 h-4 w-4" />Check Prompt</> : <><Code2 className="mr-2 h-4 w-4" />Analyze Code</>}
             </Button>
             {isRunning && analysisSlowMsg && (
               <p className="text-center text-[11px] text-amber-400/80 font-medium animate-pulse">

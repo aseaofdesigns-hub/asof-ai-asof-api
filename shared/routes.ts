@@ -32,6 +32,7 @@ export const codeAnalysisResultSchema = z.object({
   isSample: z.boolean().optional(),
   score: z.number().optional(),
   analysisId: z.number().optional(),
+  mode: z.enum(['code', 'prompt']).optional(),
 });
 
 export type CodeAnalysisResult = z.infer<typeof codeAnalysisResultSchema>;

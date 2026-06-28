@@ -1248,13 +1248,18 @@ export async function registerRoutes(
   // ── AI-powered code analysis ──────────────────────────────────────────────
   app.post('/api/analyze-code', analyzeLimiter, analyzeHourlyLimiter, async (req, res) => {
     try {
-      const { code, prompt: userPrompt, sessionId, fingerprint, tier: explicitTier, projectName } = req.body;
+      const { code, prompt: userPrompt, sessionId, fingerprint, tier: explicitTier, projectName, mode } = req.body;
+      const isPromptMode = mode === 'prompt';
 
       if (!code || typeof code !== 'string' || code.trim().length < 10) {
-        return res.status(400).json({ message: "Please paste at least 10 characters of code to analyze." });
+        return res.status(400).json({ message: isPromptMode
+          ? "Please paste at least 10 characters of your prompt to analyze."
+          : "Please paste at least 10 characters of code to analyze." });
       }
       if (code.length > 20000) {
-        return res.status(400).json({ message: "Code is too long. Please paste 20,000 characters or fewer." });
+        return res.status(400).json({ message: isPromptMode
+          ? "Your prompt is too long. Please paste 20,000 characters or fewer."
+          : "Code is too long. Please paste 20,000 characters or fewer." });
       }
 
       // Determine tier
@@ -1278,11 +1283,11 @@ export async function registerRoutes(
       }
 
       // Build OpenAI prompt
-      const systemPrompt = `You are ASOF — a code auditor. Your job is to find the hidden assumptions and risks in code — whether it was written by an AI tool or by a human.
+      const codeSystemPrompt = `You are ASOF — a code auditor. Your job is to find the hidden assumptions and risks in code — whether it was written by an AI tool or by a human.
 
 When given code (and optionally the original prompt or a description of what it should do), you identify:
 1. What the code silently assumes without stating it
-2. What could break because of those assumptions  
+2. What could break because of those assumptions
 3. What the developer should verify before trusting or shipping the code
 4. A safer, improved version of the code with better error handling and safety checks
 
@@ -1311,9 +1316,47 @@ ALWAYS respond with valid JSON matching exactly this structure:
 
 Write each assumption as a statement about the code itself (e.g., "This code assumes the user always exists"), not about who wrote it. Be specific and concrete. Avoid vague warnings. Reference actual variable names, function names, and lines from the code.`;
 
-      const userMessage = userPrompt
-        ? `Original prompt: "${userPrompt}"\n\nAI-generated code:\n\`\`\`\n${code}\n\`\`\``
-        : `AI-generated code:\n\`\`\`\n${code}\n\`\`\``;
+      // Prompt Mode: audit the user's PROMPT before they send it to an AI tool.
+      const promptSystemPrompt = `You are ASOF — a prompt auditor. The user is about to send the prompt below to an AI coding tool (like Claude, ChatGPT, Cursor, or Copilot). Your job is to find the hidden assumptions, gaps, and ambiguities in the PROMPT ITSELF — before they send it — so the AI builds the right thing the first time.
+
+You identify:
+1. What the prompt silently assumes or leaves the AI to guess (data shapes, frameworks, auth, error handling, scale, security, edge cases)
+2. What could go wrong if they send it as-is (the AI builds the wrong thing, skips edge cases, makes unsafe choices)
+3. What the user should decide or specify before sending it
+4. A rewritten, sharper version of the prompt that spells out the requirements, constraints, and edge cases — ready to paste into any AI tool
+
+ALWAYS respond with valid JSON matching exactly this structure:
+{
+  "risk_level": "SAFE" | "NEEDS_REVIEW" | "RISKY" | "CRITICAL",
+  "summary": "1-2 sentences on the biggest gap or ambiguity in the prompt",
+  "assumptions": [
+    { "text": "This prompt assumes X / leaves the AI to guess Y", "severity": "LOW" | "MEDIUM" | "HIGH" }
+  ],
+  "risks": [
+    { "text": "What the AI is likely to get wrong or skip if sent as-is", "severity": "LOW" | "MEDIUM" | "HIGH" }
+  ],
+  "checks": [
+    "Specific thing the user should decide or specify before sending the prompt"
+  ],
+  "safer_code": "The full rewritten prompt — clearer requirements, constraints, edge cases, and success criteria spelled out. Written as a ready-to-send prompt addressed to the AI, in plain prose. This is a PROMPT, not code.",
+  "suggestions": [
+    {
+      "problem": "Short name for the gap in the prompt",
+      "why_it_matters": "Why leaving this vague leads the AI astray",
+      "fix": "The concrete detail or constraint to add to the prompt"
+    }
+  ]
+}
+
+Here, risk_level rates how risky/incomplete the PROMPT is: SAFE = clear and complete; CRITICAL = so vague the AI will almost certainly build the wrong thing. Be specific and concrete — quote the actual words of the prompt. Avoid vague advice.`;
+
+      const systemPrompt = isPromptMode ? promptSystemPrompt : codeSystemPrompt;
+
+      const userMessage = isPromptMode
+        ? `The user is about to send this prompt to an AI coding tool. Audit it:\n\nPrompt:\n"""\n${code}\n"""`
+        : (userPrompt
+          ? `Original prompt: "${userPrompt}"\n\nAI-generated code:\n\`\`\`\n${code}\n\`\`\``
+          : `AI-generated code:\n\`\`\`\n${code}\n\`\`\``);
 
       let raw: string;
       try {
@@ -1340,6 +1383,9 @@ Write each assumption as a statement about the code itself (e.g., "This code ass
       } catch {
         return res.status(500).json({ message: "AI returned invalid JSON. Please try again." });
       }
+      // Tag the analysis with its mode so history, upgrades, and the PDF can tell
+      // a prompt audit apart from a code audit.
+      analysis.mode = isPromptMode ? 'prompt' : 'code';
 
       // Record free trial usage
       if (tier === 'free' && fingerprint) {
@@ -1373,6 +1419,7 @@ Write each assumption as a statement about the code itself (e.g., "This code ass
         summary: analysis.summary ?? '',
         assumptions: analysis.assumptions ?? [],
         tier,
+        mode: isPromptMode ? 'prompt' : 'code',
         score: computeSafetyScore(analysis),
         analysisId: savedAnalysis.id,
       };
@@ -1481,6 +1528,7 @@ Write each assumption as a statement about the code itself (e.g., "This code ass
         summary: fullData.summary ?? record.summary,
         assumptions: fullData.assumptions ?? [],
         tier,
+        mode: fullData.mode === 'prompt' ? 'prompt' : 'code',
         score: computeSafetyScore(fullData),
         analysisId: record.id,
         projectName: record.projectName ?? undefined,
