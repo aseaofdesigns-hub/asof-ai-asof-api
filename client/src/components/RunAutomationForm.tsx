@@ -978,7 +978,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         <CardTitle className="flex items-center justify-between text-lg">
           <div className="flex items-center gap-2">
             <Code2 className="w-5 h-5 text-primary" />
-            Analyze AI-Generated Code
+            Analyze Your Code
           </div>
           <button
             data-testid="button-load-demo"
@@ -989,7 +989,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
             <span>Test<br />It<br />Out</span>
           </button>
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Paste code from Cursor, Claude, ChatGPT, or any AI tool — ASOF finds every assumption it made. New here? Hit <span className="text-yellow-400 font-medium">Test It Out</span> to see a real example.</p>
+        <p className="text-xs text-muted-foreground">Paste any code — from Cursor, Claude, ChatGPT, or written by hand — and ASOF finds every hidden assumption and what could break. New here? Hit <span className="text-yellow-400 font-medium">Test It Out</span> to see a real example.</p>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
@@ -1011,7 +1011,7 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
         {/* Code input — always visible */}
         <div className="space-y-2">
           <Label htmlFor="code-input" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            AI-Generated Code
+            Your Code
             {isExampleLoaded && exampleTier && (
               <span className="text-yellow-400 font-black tracking-widest">
                 {exampleTier.toUpperCase()}
