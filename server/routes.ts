@@ -774,6 +774,24 @@ function gateSeverityByTier(result: any, tier: "lite" | "pro" | "max"): any {
   return gatedResult;
 }
 
+// Safety score (0-100) shown as "% safe". Anchored to the risk level, then nudged
+// within that band by the count/severity of issues. Computed from the FULL analysis
+// so the score is identical across free/paid (gating hides detail, not the risk).
+function computeSafetyScore(analysis: any): number {
+  const level = String(analysis?.risk_level ?? 'NEEDS_REVIEW').toUpperCase();
+  const bands: Record<string, [number, number]> = {
+    SAFE: [85, 98], NEEDS_REVIEW: [52, 72], RISKY: [24, 46], CRITICAL: [4, 22],
+  };
+  const [lo, hi] = bands[level] ?? [40, 60];
+  const issues = [...(analysis?.assumptions ?? []), ...(analysis?.risks ?? [])];
+  let penalty = 0;
+  for (const i of issues) {
+    const s = String(i?.severity ?? '').toUpperCase();
+    penalty += s === 'CRITICAL' ? 7 : s === 'HIGH' ? 4 : s === 'MEDIUM' ? 2 : 1;
+  }
+  return Math.max(lo, Math.min(hi, hi - penalty));
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1355,6 +1373,7 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
         summary: analysis.summary ?? '',
         assumptions: analysis.assumptions ?? [],
         tier,
+        score: computeSafetyScore(analysis),
         analysisId: savedAnalysis.id,
       };
 
@@ -1462,6 +1481,7 @@ Be specific and concrete. Avoid vague warnings. Reference actual variable names,
         summary: fullData.summary ?? record.summary,
         assumptions: fullData.assumptions ?? [],
         tier,
+        score: computeSafetyScore(fullData),
         analysisId: record.id,
         projectName: record.projectName ?? undefined,
       };

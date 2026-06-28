@@ -121,7 +121,7 @@ export function AnalysisResultPanel({ result, originalCode, onDismiss, onDownloa
   const risks = (result.risks ?? []).slice().sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
   const suggestions = result.suggestions ?? [];
   const rs = RISK_STYLE[result.risk_level] ?? RISK_STYLE.NEEDS_REVIEW;
-  const score = SCORE_MAP[result.risk_level] ?? 50;
+  const score = result.score ?? SCORE_MAP[result.risk_level] ?? 50;
 
   const topFixes = [...risks, ...assumptions].filter(i => i.severity === "HIGH").slice(0, 3);
 

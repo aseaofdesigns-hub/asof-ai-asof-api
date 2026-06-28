@@ -457,7 +457,7 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
 
   // ── 1. RISK SUMMARY ─────────────────────────────────────────────
   const rc = RISK_RGB[result.risk_level] ?? [107,114,128];
-  const score = SCORE_MAP[result.risk_level] ?? 50;
+  const score = result.score ?? SCORE_MAP[result.risk_level] ?? 50;
 
   doc.setFontSize(15);
   doc.setFont("helvetica", "bold");
