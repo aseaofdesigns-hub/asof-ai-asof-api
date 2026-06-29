@@ -617,15 +617,18 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
     if (isPrompt) {
       // A rewritten prompt is prose — render it as full, wrapped, paginated
       // text (not a truncated code terminal) so nothing gets cut off.
-      doc.setFontSize(9.5);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(45, 35, 65);
       const lineH = 5;
       const paras = result.safer_code.split("\n");
       for (const para of paras) {
         const lines = doc.splitTextToSize(para.trim() === "" ? " " : para, cW - 8);
         for (const ln of lines) {
           checkY(lineH + 2);
+          // Re-apply the body style on every line. checkY() may have started a
+          // new page, which leaves the light-purple header font active — without
+          // this, post-page-break text would inherit that faint header style.
+          doc.setFontSize(9.5);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(45, 35, 65);
           doc.text(ln, M + 4, y);
           y += lineH;
         }
@@ -1022,9 +1025,9 @@ export function RunAutomationForm({ onResult }: { onResult?: (result: CodeAnalys
           )}
         </CardTitle>
         {mode === 'prompt' ? (
-          <p className="text-xs text-muted-foreground">About to ask an AI to build something? Paste your prompt here first. ASOF finds what's vague or missing — and on <span className="text-purple-300 font-medium">Max</span> hands you a sharper, ready-to-send rewrite side-by-side.</p>
+          <p className="text-xs text-muted-foreground">About to ask an AI to build something? Paste your prompt here first. ASOF finds what's vague or missing, and the <span className="text-purple-300 font-medium">Max</span> level gives you a sharper, ready-to-send rewrite side by side.</p>
         ) : (
-          <p className="text-xs text-muted-foreground">Is your code right? Paste it — whether you wrote it yourself or an AI did — and ASOF finds every hidden assumption and what could break before you ship. Perfect for double-checking your own work. New here? Hit <span className="text-yellow-400 font-medium">Test It Out</span> to see a real example.</p>
+          <p className="text-xs text-muted-foreground">Is your code right? Paste it, whether you wrote it yourself or an AI did, and ASOF finds every hidden assumption and what could break before you ship. Perfect for double-checking your own work.</p>
         )}
       </CardHeader>
 

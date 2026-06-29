@@ -48,17 +48,22 @@ export default function FAQ() {
     },
     {
       question: "Can I try ASOF.ai before paying?",
-      answer: "Yes. You get one free trial per device — no payment required. The free trial gives you the risk verdict and up to 2 hidden assumptions. Upgrade to Lite ($0.50) for the full assumption list, every risk flag, and a PDF report.",
+      answer: "Yes. You get one free trial per device, no payment required. The free trial gives you the risk verdict and up to 2 hidden assumptions. Upgrade to Lite ($0.50) for the full assumption list, every risk flag, and a PDF report.",
+      icon: <Check className="w-4 h-4 text-emerald-400" />
+    },
+    {
+      question: "Can ASOF check my prompt before I send it to an AI?",
+      answer: "Yes. Switch to Check Prompt mode, paste the prompt you're about to give an AI tool like Claude, ChatGPT, or Cursor, and ASOF flags what's vague or missing so the AI builds the right thing the first time. On Max you get a sharper, ready-to-send rewrite side by side with your original.",
       icon: <Check className="w-4 h-4 text-emerald-400" />
     },
     {
       question: "Can I cancel?",
-      answer: "Yes. Just don't complete checkout — nothing runs, nothing charges.",
+      answer: "Yes. Just don't complete checkout, and nothing runs and nothing charges.",
       icon: <Check className="w-4 h-4 text-emerald-400" />
     },
     {
       question: "What does each tier include?",
-      answer: "Free trial: risk verdict and 2 assumptions (no PDF). Lite ($0.50): full assumption list, every risk flag, and PDF download. Pro ($1.00): adds a verify checklist and suggestion cards. Max ($2.50): adds a safer code rewrite side-by-side with your original.",
+      answer: "Free trial: risk verdict and 2 assumptions (no PDF). Lite ($0.50): full assumption list, every risk flag, and PDF download. Pro ($1.00): adds a verify checklist and suggestion cards. Max ($2.50): adds a side-by-side rewrite, of your code or your prompt, next to your original.",
       icon: <Check className="w-4 h-4 text-emerald-400" />
     },
   ];
@@ -95,7 +100,7 @@ export default function FAQ() {
                 <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                   <p className="text-sm text-emerald-400 font-medium flex items-center gap-2">
                     <Check className="w-4 h-4" />
-                    No automatic charges — you control every validation
+                    No automatic charges. You control every validation
                   </p>
                 </div>
                 
@@ -135,7 +140,7 @@ export default function FAQ() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground leading-relaxed">
-                  ASOF.ai performs real-time, conflict-aware analysis to verify whether something is still true <strong className="text-foreground">as of now</strong>. Each validation runs live scoring, evidence weighting, and risk detection so you can act with confidence — not guesses.
+                  ASOF.ai performs real-time, conflict-aware analysis to verify whether something is still true <strong className="text-foreground">as of now</strong>. Each validation runs live scoring, evidence weighting, and risk detection so you can act with confidence, not guesses.
                 </p>
                 
                 <div className="grid sm:grid-cols-3 gap-4 pt-4">

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { ShieldCheck, Zap, Globe, AlertTriangle, Code2, GitPullRequest, Cpu, Users } from "lucide-react";
+import { ShieldCheck, Zap, Globe, AlertTriangle, Code2, GitPullRequest, Cpu, Users, Sparkles } from "lucide-react";
 
 export default function About() {
   const container = {
@@ -16,7 +16,7 @@ export default function About() {
   const assumptions = [
     { bad: "AI assumed Stripe webhook events are always delivered in order.", risk: "Payments could be applied twice or missed entirely." },
     { bad: "AI assumed userId is already authorized before this function runs.", risk: "Any user could access another user's data." },
-    { bad: "AI assumed this API returns amounts in cents — it returns dollars.", risk: "Every transaction is off by 100x." },
+    { bad: "AI assumed this API returns amounts in cents, but it returns dollars.", risk: "Every transaction is off by 100x." },
     { bad: "AI assumed the compliance rule from 2023 is still in effect.", risk: "Your agent is acting on outdated regulation." },
   ];
 
@@ -26,7 +26,7 @@ export default function About() {
       bg: "bg-primary/20",
       label: "Developers",
       tagline: "Assumption validation for any code",
-      desc: "Catch silent guesses — whether from an AI coding agent or your own hands — before they hit production."
+      desc: "Catch silent guesses, whether from an AI coding agent or your own hands, before they hit production."
     },
     {
       icon: <Users className="w-5 h-5 text-emerald-400" />,
@@ -40,7 +40,7 @@ export default function About() {
       bg: "bg-purple-500/20",
       label: "Teams",
       tagline: "Pre-merge review layer for AI coding agents",
-      desc: "Add a validation step before any code ships — AI-written or human-written — no extra tooling required."
+      desc: "Add a validation step before any code ships, AI-written or human-written, with no extra tooling required."
     },
   ];
 
@@ -65,23 +65,44 @@ export default function About() {
           {/* Hero */}
           <div className="text-center space-y-5">
             <motion.div variants={item} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary uppercase tracking-widest">
-              The second opinion your code deserves
+              The second opinion your project deserves
             </motion.div>
             <motion.h1 variants={item} className="text-4xl md:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/50">
                       ASOF finds the hidden assumptions in your code before they break in production.
             </motion.h1>
             <motion.p variants={item} className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Whether you wrote it yourself or an AI did — code makes silent assumptions about inputs, APIs, and databases. ASOF surfaces every one of them before you ship.
+              Whether you wrote it yourself or an AI did, code makes silent assumptions about inputs, APIs, and databases. ASOF surfaces every one of them before you ship, and it can audit your prompts the same way before you ever send them.
             </motion.p>
           </div>
+
+          {/* Two modes */}
+          <motion.div variants={item} className="space-y-3">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Two ways to use ASOF</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="glass-card p-6 rounded-2xl border border-blue-500/20 bg-blue-500/5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/20 flex items-center justify-center"><Code2 className="w-5 h-5 text-blue-300" /></div>
+                  <p className="font-bold text-white">Check Code</p>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">Already have code, AI-generated or self-written? Paste it and ASOF finds the hidden assumptions and what could break before you ship. On Max you also get a safer rewrite side by side.</p>
+              </div>
+              <div className="glass-card p-6 rounded-2xl border border-purple-500/20 bg-purple-500/5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center"><Sparkles className="w-5 h-5 text-purple-300" /></div>
+                  <p className="font-bold text-white">Check Prompt</p>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">About to ask an AI to build something? Paste your prompt first and ASOF audits it for what's vague or missing, so the AI builds the right thing the first time. On Max you get a sharper, ready-to-send rewrite side by side.</p>
+              </div>
+            </div>
+          </motion.div>
 
           {/* The four outputs */}
           <motion.div variants={item} className="space-y-3">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">What you get back</p>
             <div className="grid sm:grid-cols-2 gap-3">
               {[
-                { emoji: "🔍", label: "What the AI assumed", desc: "Hidden context the AI filled in without being told — about your auth, data format, API behavior, ordering, or environment.", color: "border-blue-500/20 bg-blue-500/5" },
-                { emoji: "💥", label: "What could break", desc: "The specific failure modes those assumptions create — race conditions, wrong amounts, unauthorized access, stale state.", color: "border-red-500/20 bg-red-500/5" },
+                { emoji: "🔍", label: "What the AI assumed", desc: "Hidden context the AI filled in without being told, about your auth, data format, API behavior, ordering, or environment.", color: "border-blue-500/20 bg-blue-500/5" },
+                { emoji: "💥", label: "What could break", desc: "The specific failure modes those assumptions create, like race conditions, wrong amounts, unauthorized access, and stale state.", color: "border-red-500/20 bg-red-500/5" },
                 { emoji: "✅", label: "What you should verify", desc: "A concrete checklist of things to confirm before running, deploying, or copying the code into your project.", color: "border-amber-500/20 bg-amber-500/5" },
                 { emoji: "🚦", label: "Safe to run / Risky / Needs review", desc: "A confidence-scored verdict so you know at a glance whether to trust it, fix it, or ask your AI to try again.", color: "border-emerald-500/20 bg-emerald-500/5" },
               ].map((o, i) => (
@@ -127,7 +148,7 @@ export default function About() {
           {/* Before/After Examples */}
           <motion.div variants={item} className="space-y-4">
             <h2 className="text-2xl font-bold">What ASOF catches</h2>
-            <p className="text-muted-foreground">These are real classes of assumptions AI coding agents make — silently, confidently, and sometimes catastrophically.</p>
+            <p className="text-muted-foreground">These are real classes of assumptions AI coding agents make, silently, confidently, and sometimes catastrophically.</p>
             <div className="space-y-3">
               {assumptions.map((a, i) => (
                 <div key={i} className="glass-card rounded-xl border border-white/5 overflow-hidden">
@@ -164,7 +185,7 @@ export default function About() {
 
             {/* Tier structure */}
             <div className="glass-card p-6 rounded-2xl border border-white/5 space-y-4">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Tier structure — pay only for what you need</p>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Tier structure: pay only for what you need</p>
               <div className="grid sm:grid-cols-3 gap-3">
                 {[
                   {
@@ -177,7 +198,7 @@ export default function About() {
                   },
                   {
                     name: "Max", price: "$2.50", color: "text-purple-400", border: "border-purple-500/20 bg-purple-500/5",
-                    features: ["Everything in Pro", "Safer code rewrite", "Side-by-side diff"],
+                    features: ["Everything in Pro", "Safer code rewrite", "Prompt rewrite", "Side-by-side view"],
                   },
                 ].map((t, i) => (
                   <div key={i} className={`rounded-xl border p-4 space-y-2 ${t.border}`}>
@@ -196,7 +217,7 @@ export default function About() {
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-muted-foreground text-center">One free trial per device (verdict + 2 assumptions) — no payment required to start.</p>
+              <p className="text-[10px] text-muted-foreground text-center">One free trial per device (verdict plus 2 assumptions). No payment required to start.</p>
             </div>
           </motion.div>
 
@@ -207,7 +228,7 @@ export default function About() {
                 <GitPullRequest className="w-5 h-5 text-purple-400" />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Integrations — coming soon</h2>
+                <h2 className="text-xl font-bold">Integrations coming soon</h2>
                 <p className="text-xs text-muted-foreground">Mentioned early because they're the obvious next step.</p>
               </div>
             </div>
@@ -235,7 +256,7 @@ export default function About() {
             <div className="max-w-xl space-y-4">
               <h2 className="text-2xl font-bold">Our Mission</h2>
               <p className="text-muted-foreground leading-relaxed text-lg">
-                To build the infrastructure for a world where AI agents act on verified reality — not stale data, unchecked assumptions, or confident guesses.
+                To build the infrastructure for a world where AI agents act on verified reality, not stale data, unchecked assumptions, or confident guesses.
               </p>
             </div>
           </motion.div>

@@ -14,6 +14,7 @@ const FEATURE_ROWS = [
   { label: "Verify Checklist", lite: false, pro: true, max: true },
   { label: "Suggestion Cards", lite: false, pro: true, max: true },
   { label: "Safer Code Rewrite", lite: false, pro: false, max: true },
+  { label: "Prompt Rewrite", lite: false, pro: false, max: true },
 ];
 
 const TIERS = [
@@ -48,7 +49,7 @@ const TIERS = [
     name: "ASOF Max",
     price: "$2.50",
     tagline: "Per analysis",
-    description: "Full analysis plus a side-by-side safer code rewrite you can drop right in.",
+    description: "Full analysis plus a side-by-side rewrite, of your code or your prompt, you can drop right in.",
     icon: <ShieldCheck className="w-5 h-5 text-purple-400" />,
     accent: "purple",
     borderClass: "border-purple-500/30",
@@ -145,14 +146,14 @@ export default function Pricing() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider mb-5">
             <Tag className="w-3 h-3" />
-            Pay per analysis — no subscription
+            Pay per analysis, no subscription
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
             Simple, honest pricing
           </h1>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto leading-relaxed">
-            Each tier gives you a deeper look at what your code assumed and where it could fail — AI-written or your own.
-            Pay once per analysis — no monthly fees.
+            Each tier gives you a deeper look at what your code or prompt assumed and where it could fail, whether AI-written or your own.
+            Pay once per analysis, with no monthly fees.
           </p>
         </motion.div>
 
@@ -295,9 +296,9 @@ export default function Pricing() {
         >
           <span className="text-xl shrink-0 mt-0.5">⚠️</span>
           <div className="space-y-1.5">
-            <p className="text-sm font-bold text-amber-300">Important — do not clear your browser cache or site data</p>
+            <p className="text-sm font-bold text-amber-300">Important: do not clear your browser cache or site data</p>
             <p className="text-xs text-white/60 leading-relaxed">
-              Because ASOF doesn't require an account, your paid credits and analysis history are tied to a unique ID stored in <span className="text-white/80 font-medium">this browser only</span>. If you clear your browser's cache, cookies, or site data — or switch to a different browser or device — that ID is gone and your credits cannot be automatically recovered.
+              Because ASOF doesn't require an account, your paid credits and analysis history are tied to a unique ID stored in <span className="text-white/80 font-medium">this browser only</span>. If you clear your browser's cache, cookies, or site data, or switch to a different browser or device, that ID is gone and your credits cannot be automatically recovered.
             </p>
             <p className="text-xs text-white/60 leading-relaxed">
               If this happens, email <a href="mailto:Support@asofai.com" className="text-amber-300 hover:underline font-medium">Support@asofai.com</a> with the email address you used at checkout and we'll manually restore your credits. Keep your Stripe receipt as proof of purchase.
