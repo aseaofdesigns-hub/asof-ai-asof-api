@@ -89,7 +89,7 @@ export default function Dashboard() {
           className="space-y-8"
         >
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">ASOF finds the hidden assumptions in your code before they break in production.</h1>
+            <h1 className="text-3xl font-bold tracking-tight">ASOF finds the hidden assumptions in your project before they break in production.</h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
               Paste any code, whether AI-generated or self-written, or a prompt, and get back: what was assumed, what could break, what to verify, what to change, and whether it's safe to ship.
             </p>

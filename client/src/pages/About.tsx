@@ -68,7 +68,7 @@ export default function About() {
               The second opinion your project deserves
             </motion.div>
             <motion.h1 variants={item} className="text-4xl md:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/50">
-                      ASOF finds the hidden assumptions in your code before they break in production.
+                      ASOF finds the hidden assumptions in your project before they break in production.
             </motion.h1>
             <motion.p variants={item} className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               Whether you wrote it yourself or an AI did, code makes silent assumptions about inputs, APIs, and databases. ASOF surfaces every one of them before you ship, and it can audit your prompts the same way before you ever send them.
