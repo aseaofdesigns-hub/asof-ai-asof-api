@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CreditCard, Lightbulb, HelpCircle, Check, X, Copy, CheckCircle } from "lucide-react";
+import { CreditCard, Lightbulb, HelpCircle, Check, X, Copy, CheckCircle, ShieldCheck, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
 import {
   Accordion,
   AccordionContent,
@@ -165,6 +166,33 @@ export default function FAQ() {
                     <span className="text-muted-foreground">You only pay when you approve a validation.</span>
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Validity / proof */}
+          <motion.div variants={item}>
+            <Card className="glass-card border-white/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="bg-emerald-500/20 p-2 rounded-lg">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  Does it actually work?
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground leading-relaxed">
+                  Fair question. We put ASOF.ai to the test with a deliberately dangerous prompt, then fed its rewritten version to six major AI tools. All six built the safe, compliant version instead of the risky one. Zero misses.
+                </p>
+                <Link
+                  href="/proof"
+                  data-testid="link-proof"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                >
+                  See the proof: six AIs, one rewritten prompt
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
               </CardContent>
             </Card>
           </motion.div>

@@ -491,6 +491,9 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
     ...(result.assumptions ?? []),
   ].sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
   const topFixes = allItems.filter(i => i.severity === "CRITICAL" || i.severity === "HIGH").slice(0, 3);
+  // Items promoted to "Fix These First" are hidden from the detailed sections
+  // below so the same text never appears twice in the report.
+  const topFixTexts = new Set(topFixes.map(f => f.text));
 
   if (topFixes.length > 0) {
     sectionHeader("Fix These First");
@@ -514,11 +517,12 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
   }
 
   // ── 3. WHAT THE AI ASSUMED ───────────────────────────────────────
-  if (result.assumptions?.length) {
+  const assumptionsToShow = [...(result.assumptions ?? [])]
+    .sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9))
+    .filter(a => !topFixTexts.has(a.text));
+  if (assumptionsToShow.length) {
     sectionHeader(isPrompt ? "What This Prompt Assumes" : "What the AI Assumed");
-    const sorted = [...result.assumptions].sort(
-      (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9)
-    );
+    const sorted = assumptionsToShow;
     for (const a of sorted) {
       const lines = doc.splitTextToSize(a.text, cW - 30);
       checkY(lines.length * 5 + 8);
@@ -533,11 +537,12 @@ export async function downloadReport(result: CodeAnalysisResult, _code: string, 
   }
 
   // ── 4. WHAT COULD BREAK ─────────────────────────────────────────
-  if (result.risks?.length) {
+  const risksToShow = [...(result.risks ?? [])]
+    .sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9))
+    .filter(r => !topFixTexts.has(r.text));
+  if (risksToShow.length) {
     sectionHeader("What Could Break");
-    const sorted = [...result.risks].sort(
-      (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9)
-    );
+    const sorted = risksToShow;
     for (const r of sorted) {
       const lines = doc.splitTextToSize(r.text, cW - 30);
       checkY(lines.length * 5 + 8);

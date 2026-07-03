@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Copy, Check, Maximize2, ChevronRight, Download, AlertTriangle, XCircle, CheckCircle2, ShieldCheck, Lock, Eye } from "lucide-react";
+import { X, Copy, Check, Maximize2, ChevronRight, Download, AlertTriangle, XCircle, CheckCircle2, ShieldCheck, Lock, Eye, HelpCircle } from "lucide-react";
 import type { CodeAnalysisResult } from "@shared/routes";
 
 type Tab = "summary" | "assumptions" | "risks" | "suggestions" | "rewrite";
@@ -43,6 +43,33 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+// Small (?) help icon. Opens on tap (mobile) or hover (desktop) so complete
+// beginners know what to do with the rewrite. Plain-language, no jargon.
+function HelpTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      className="relative flex items-center"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        aria-label="What do I do with this?"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center justify-center w-5 h-5 rounded-full border border-white/20 text-white/50 hover:text-white hover:border-white/50 transition-colors"
+      >
+        <HelpCircle className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div className="absolute z-40 top-full right-0 mt-2 w-56 p-2.5 rounded-lg bg-[#0d0a1c] border border-white/15 shadow-xl text-[11px] font-normal normal-case tracking-normal leading-relaxed text-white/85">
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CodePanel({ label, code, accent = false }: { label: string; code: string; accent?: boolean }) {
   const [fullscreen, setFullscreen] = useState(false);
   return (
@@ -51,6 +78,7 @@ function CodePanel({ label, code, accent = false }: { label: string; code: strin
         <div className="flex items-center justify-between">
           <p className={`text-xs font-bold uppercase tracking-widest ${accent ? "text-emerald-400" : "text-muted-foreground"}`}>{label}</p>
           <div className="flex items-center gap-1.5">
+            {accent && <HelpTip text="Copy this and paste it into your AI or code editor for a clearer, safer result." />}
             <CopyButton text={code} />
             <button
               onClick={() => setFullscreen(true)}
