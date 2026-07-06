@@ -4,9 +4,9 @@ import { Link } from "wouter";
 export function Header() {
   return (
     <header className="border-b border-white/5 bg-background/50 backdrop-blur-xl sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         <Link href="/" className="flex items-center" data-testid="link-logo">
-          <img src="/logo.png" alt="ASOF.ai Automation" className="h-10 w-auto" />
+          <img src="/logo.png" alt="ASOF.ai Automation" className="h-14 w-auto" />
         </Link>
         
         <nav className="flex items-center gap-6">
