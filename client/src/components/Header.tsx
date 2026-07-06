@@ -1,18 +1,13 @@
-import { Cpu, Activity, Code2 } from "lucide-react";
+import { Activity, Code2 } from "lucide-react";
 import { Link } from "wouter";
 
 export function Header() {
   return (
     <header className="border-b border-white/5 bg-background/50 backdrop-blur-xl sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/20 p-2 rounded-lg">
-            <Cpu className="w-6 h-6 text-primary" />
-          </div>
-          <h1 className="text-xl font-bold tracking-tight">
-            As-of <span className="text-primary">AI</span> Automation
-          </h1>
-        </div>
+        <Link href="/" className="flex items-center" data-testid="link-logo">
+          <img src="/logo.png" alt="ASOF.ai Automation" className="h-10 w-auto" />
+        </Link>
         
         <nav className="flex items-center gap-6">
           <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-white transition-colors">
