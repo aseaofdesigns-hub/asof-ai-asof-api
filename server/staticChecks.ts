@@ -1,6 +1,12 @@
 import { parse } from "@babel/parser";
-import traverse from "@babel/traverse";
+import _traverse from "@babel/traverse";
 import * as t from "@babel/types";
+
+// @babel/traverse's CJS/ESM interop is inconsistent across bundlers — some
+// wrap the function in a `.default`, some don't. Handle both so this doesn't
+// silently break in whichever direction the production esbuild bundle picks.
+const traverse: typeof _traverse =
+  typeof _traverse === "function" ? _traverse : (_traverse as any).default;
 
 export interface StaticFinding {
   id: string;
