@@ -33,6 +33,13 @@ export const codeAnalysisResultSchema = z.object({
   score: z.number().optional(),
   analysisId: z.number().optional(),
   mode: z.enum(['code', 'prompt']).optional(),
+  static_findings: z.array(z.object({
+    id: z.string(),
+    severity: z.enum(['critical', 'warning', 'info']),
+    message: z.string(),
+    line: z.number(),
+    source: z.literal('static_analysis'),
+  })).optional(),
 });
 
 export type CodeAnalysisResult = z.infer<typeof codeAnalysisResultSchema>;

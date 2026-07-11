@@ -11,6 +11,7 @@ import { sql, eq } from "drizzle-orm";
 import { db } from "./db";
 import { freeTrials, payments, codeAnalyses } from "@shared/schema";
 import OpenAI from "openai";
+import { runStaticChecks } from "./staticChecks";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -777,7 +778,7 @@ function gateSeverityByTier(result: any, tier: "lite" | "pro" | "max"): any {
 // Safety score (0-100) shown as "% safe". Anchored to the risk level, then nudged
 // within that band by the count/severity of issues. Computed from the FULL analysis
 // so the score is identical across free/paid (gating hides detail, not the risk).
-function computeSafetyScore(analysis: any): number {
+function computeSafetyScore(analysis: any, staticFindings: { severity: string }[] = []): number {
   const level = String(analysis?.risk_level ?? 'NEEDS_REVIEW').toUpperCase();
   const bands: Record<string, [number, number]> = {
     SAFE: [85, 98], NEEDS_REVIEW: [52, 72], RISKY: [24, 46], CRITICAL: [4, 22],
@@ -789,7 +790,17 @@ function computeSafetyScore(analysis: any): number {
     const s = String(i?.severity ?? '').toUpperCase();
     penalty += s === 'CRITICAL' ? 7 : s === 'HIGH' ? 4 : s === 'MEDIUM' ? 2 : 1;
   }
-  return Math.max(lo, Math.min(hi, hi - penalty));
+  let score = Math.max(lo, Math.min(hi, hi - penalty));
+
+  // A parser-confirmed critical finding overrides an overly generous model
+  // verdict — the model can't grade its own output into a passing score
+  // when there's a concrete, independently-verifiable problem in the code.
+  const hasCriticalStatic = staticFindings.some(f => f.severity === 'critical');
+  const hasWarningStatic = staticFindings.some(f => f.severity === 'warning');
+  if (hasCriticalStatic) score = Math.min(score, 40);
+  else if (hasWarningStatic) score = Math.min(score, 70);
+
+  return score;
 }
 
 export async function registerRoutes(
@@ -1282,6 +1293,17 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Payment required. Please select a tier to continue." });
       }
 
+      // Static analysis pass — runs before the LLM call, costs nothing, and
+      // never blocks the request (parse failures just yield no findings).
+      // Only meaningful for actual code, not for Prompt Mode's natural-language input.
+      // Findings are surfaced in the response, given to the model as ground truth,
+      // and put a floor under computeSafetyScore() — a parser-confirmed critical
+      // finding can't be graded away by an overly generous model verdict.
+      const staticFindings = isPromptMode ? [] : runStaticChecks(code);
+      const staticFindingsBlock = staticFindings.length > 0
+        ? `\n\nStatic analysis has already found the following issues in this code (these are certain, not guesses — do not contradict them):\n${staticFindings.map(f => `- Line ${f.line}: ${f.message} (${f.severity})`).join("\n")}\n\nYour job is to find additional risks the static pass can't detect (business logic errors, incorrect assumptions about data shape, etc.), not to re-evaluate the findings above.`
+        : '';
+
       // Build OpenAI prompt
       const codeSystemPrompt = `You are ASOF — a code auditor. Your job is to find the hidden assumptions and risks in code — whether it was written by an AI tool or by a human.
 
@@ -1355,8 +1377,8 @@ Here, risk_level rates how risky/incomplete the PROMPT is: SAFE = clear and comp
       const userMessage = isPromptMode
         ? `The user is about to send this prompt to an AI coding tool. Audit it:\n\nPrompt:\n"""\n${code}\n"""`
         : (userPrompt
-          ? `Original prompt: "${userPrompt}"\n\nAI-generated code:\n\`\`\`\n${code}\n\`\`\``
-          : `AI-generated code:\n\`\`\`\n${code}\n\`\`\``);
+          ? `Original prompt: "${userPrompt}"\n\nAI-generated code:\n\`\`\`\n${code}\n\`\`\`${staticFindingsBlock}`
+          : `AI-generated code:\n\`\`\`\n${code}\n\`\`\`${staticFindingsBlock}`);
 
       let raw: string;
       try {
@@ -1386,6 +1408,7 @@ Here, risk_level rates how risky/incomplete the PROMPT is: SAFE = clear and comp
       // Tag the analysis with its mode so history, upgrades, and the PDF can tell
       // a prompt audit apart from a code audit.
       analysis.mode = isPromptMode ? 'prompt' : 'code';
+      analysis.static_findings = staticFindings;
 
       // Record free trial usage
       if (tier === 'free' && fingerprint) {
@@ -1420,8 +1443,9 @@ Here, risk_level rates how risky/incomplete the PROMPT is: SAFE = clear and comp
         assumptions: analysis.assumptions ?? [],
         tier,
         mode: isPromptMode ? 'prompt' : 'code',
-        score: computeSafetyScore(analysis),
+        score: computeSafetyScore(analysis, staticFindings),
         analysisId: savedAnalysis.id,
+        static_findings: staticFindings,
       };
 
       if (tier === 'free') {
@@ -1529,9 +1553,10 @@ Here, risk_level rates how risky/incomplete the PROMPT is: SAFE = clear and comp
         assumptions: fullData.assumptions ?? [],
         tier,
         mode: fullData.mode === 'prompt' ? 'prompt' : 'code',
-        score: computeSafetyScore(fullData),
+        score: computeSafetyScore(fullData, fullData.static_findings ?? []),
         analysisId: record.id,
         projectName: record.projectName ?? undefined,
+        static_findings: fullData.static_findings ?? [],
       };
 
       if (tier === 'free') {
